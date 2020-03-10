@@ -54,6 +54,8 @@ public:
   }
 };
 
+TEST_F(DataFrameTest, Loads) {}
+
 TEST_F(DataFrameTest, GetSchema) { ASSERT(d->get_schema().equals(s2)); }
 
 TEST_F(DataFrameTest, EmptyRowsCols) {

@@ -1,63 +1,40 @@
+// lang: CwC
 #pragma once
-// lang:CwC
+#include <assert.h>
 
 #include "object.h"
+#include "string.h"
+#include "util.h"
 
-static const double DOUBLE_TOLERANCE = 0.0001;
+// THIS IS A TEST
 
-class Util : public Object {
-public:
-  /** Equality functions **/
-  static bool equals(Object *a, Object *b) {
-    if (a == nullptr && b == nullptr) {
-      return true;
-    } else if (a == nullptr && b != nullptr) {
-      return false;
-    } else if (a != nullptr && b == nullptr) {
-      return false;
-    } else {
-      return a->equals(b);
-    }
-  }
+static const size_t CHUNK_SIZE = 1024;
 
-  static bool equals(int a, int b) { return a == b; }
-  static bool equals(float a, float b) { return a == b; }
-  static bool equals(double a, double b) {
-    return !((a - b > DOUBLE_TOLERANCE) || (b - a > DOUBLE_TOLERANCE));
-  }
-  static bool equals(bool a, bool b) { return a == b; }
-
-  /** Hash functions **/
-  static size_t hash(Object *a) { return (a == nullptr) ? 0 : a->hash(); }
-  static size_t hash(int a) { return a; }
-  static size_t hash(float a) { return std::hash<float>{}(a); }   // lang: Cpp
-  static size_t hash(double a) { return std::hash<double>{}(a); } // lang: Cpp
-  static size_t hash(bool a) { return a; }
-
-  /** Clone functions **/
-  static Object *clone(Object *a) { return (a == nullptr) ? a : a->clone(); }
-  static int clone(int a) { return a; }
-  static float clone(float a) { return a; }
-  static double clone(double a) { return a; }
-  static bool clone(bool a) { return a; }
-};
-
-/**
- * #define gen_array(KlassArray, Stores) \
+#define generate_classarray(KlassArray, Stores)                                \
   class KlassArray : public Object {                                           \
   public:                                                                      \
-    size_t num_chunks_ = 1;                                                    \
-    size_t num_elements_ = 0;                                                  \
-    size_t capacity_ = CHUNK_SIZE;                                             \
-    Stores **elements_ = new Stores *[num_chunks_];                            \
-    elements_[0] = new Stores[capacity_];                                      \
-    \
-    ~KlassArray() {                                                            \
+    size_t num_chunks_;                                                        \
+    size_t num_elements_;                                                      \
+    size_t capacity_;                                                          \
+    size_t start_pos_;                                                         \
+    Stores **elements_;                                                        \
+                                                                               \
+    KlassArray() : Object() {                                                  \
+      num_chunks_ = 1;                                                         \
+      num_elements_ = 0;                                                       \
+      start_pos_ = 0;                                                          \
+      capacity_ = CHUNK_SIZE;                                                  \
+      elements_ = new Stores *[num_chunks_];                                   \
+      elements_[0] = new Stores[capacity_];                                    \
+    }                                                                          \
+                                                                               \
+    virtual ~KlassArray() {                                                    \
       for (size_t i = 0; i < num_chunks_; i++) {                               \
         delete[] elements_[i];                                                 \
       }                                                                        \
       delete[] elements_;                                                      \
     }                                                                          \
+                                                                               \
     void _resize_to_(size_t new_capacity) {                                    \
       if ((new_capacity / CHUNK_SIZE) <= num_chunks_) {                        \
         return;                                                                \
@@ -78,7 +55,7 @@ public:
       elements_ = new_elements;                                                \
       capacity_ = CHUNK_SIZE * new_num_chunks;                                 \
       num_chunks_ = new_num_chunks;                                            \
-      if (num_elements >= capacity_) {                                         \
+      if (num_elements_ >= capacity_) {                                        \
         num_elements_ -= (num_elements_ - capacity_);                          \
       }                                                                        \
     }                                                                          \
@@ -174,4 +151,26 @@ public:
                                                                                \
     virtual size_t size() { return num_elements_; }                            \
   }
-**/
+
+generate_classarray(Array, Object *);
+generate_classarray(BoolArray, bool);
+generate_classarray(IntArray, int);
+generate_classarray(FloatArray, float);
+generate_classarray(DoubleArray, double);
+
+#define generate_object_classarray(KlassArray, Klass)                          \
+  class KlassArray : public Array {                                            \
+  public:                                                                      \
+    Klass *get(size_t index) {                                                 \
+      return dynamic_cast<Klass *>(Array::get(index));                         \
+    }                                                                          \
+    Klass *set(size_t index, Klass *v) {                                       \
+      return dynamic_cast<Klass *>(Array::set(index, v));                      \
+    }                                                                          \
+    Klass *remove(size_t index) {                                              \
+      return dynamic_cast<Klass *>(Array::remove(index));                      \
+    }                                                                          \
+    KlassArray *clone() { return dynamic_cast<KlassArray *>(Array::clone()); } \
+  }
+
+generate_object_classarray(StringArray, String);

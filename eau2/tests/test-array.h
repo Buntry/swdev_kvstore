@@ -296,3 +296,15 @@ TEST_F(ArrayTest, StringArrayHandlesNullptr) {
   other_a->add_all(0, a);
   ASSERT(a->equals(other_a));
 }
+
+// ---- Cloning ----
+TEST_F(ArrayTest, StringArrayCanClone) {
+  sa->push_back(b);
+  sa->push_back(c);
+  sa->push_back(d);
+
+  StringArray *sa2 = sa->clone();
+  ASSERT(sa->equals(sa2));
+
+  delete sa2;
+}
