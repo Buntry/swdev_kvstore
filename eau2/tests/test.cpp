@@ -8,6 +8,7 @@
 #include "test-rower.h"
 #include "test-schema.h"
 #include "test-string.h"
+#include "test-util.h"
 #include <gtest/gtest.h>
 
 int main(int argc, char **argv) {
