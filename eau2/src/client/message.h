@@ -3,8 +3,8 @@
 
 #include <arpa/inet.h>
 
-#include "array.h"
-#include "pack.h"
+#include "../utils/array.h"
+#include "../utils/pack.h"
 
 /** Represents the types of messages a node can send over the network. **/
 enum class MsgKind {

@@ -1,8 +1,8 @@
 // lang: CwC
 #pragma once
 
-#include "../src/array.h"
-#include "../src/object.h"
+#include "../src/utils/array.h"
+#include "../src/utils/object.h"
 #include "test-macros.h"
 #include <gtest/gtest.h>
 

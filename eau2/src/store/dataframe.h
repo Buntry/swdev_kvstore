@@ -1,11 +1,11 @@
 // lang: CwC
 #pragma once
 
-#include "array.h"
-#include "object.h"
+#include "../utils/array.h"
+#include "../utils/object.h"
+#include "../utils/string.h"
+#include "../utils/thread.h"
 #include "stdarg.h"
-#include "string.h"
-#include "thread.h"
 
 /** Static variable for number of rows before we consider multi-threading. **/
 /** This will also be used as a number of when to determine the amount of
