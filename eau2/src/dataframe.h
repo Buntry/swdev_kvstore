@@ -226,21 +226,13 @@ public:
 
   /** Acquire ownership of the string. Out of bound idx is undefined.
    * Since a StrColumn clones */
-  void set(size_t idx, String *val) {
-    String *s = vals_.get(idx);
-    if (s != nullptr) {
-      delete vals_.get(idx);
-    }
-    vals_.set(idx, val);
-  }
+  void set(size_t idx, String *val) { delete vals_.set(idx, val); }
 
   size_t size() { return vals_.size(); }
 
   /** Since Strings are external unless otherwise stated, we make a clone
    * so that we can manage its memory. **/
-  virtual void push_back(String *s) {
-    vals_.push_back((s == nullptr) ? s : s->clone());
-  };
+  virtual void push_back(String *s) { vals_.push_back(Util::clone(s)); };
 
   /** Object methods to satisfy requirement of being an object. **/
   StringColumn *clone() {
@@ -263,7 +255,7 @@ public:
  */
 class Schema : public Object {
 public:
-  StringArray *types_;
+  CharArray *types_;
   StringArray *rows_;
   StringArray *cols_;
 
@@ -276,7 +268,7 @@ public:
 
   /** Create an empty schema **/
   Schema() {
-    types_ = new StringArray();
+    types_ = new CharArray();
     rows_ = new StringArray();
     cols_ = new StringArray();
   }
@@ -286,7 +278,7 @@ public:
    * undefined behavior. The argument is external, a nullptr argument is
    * undefined. **/
   Schema(const char *types) {
-    types_ = new StringArray();
+    types_ = new CharArray();
     rows_ = new StringArray();
     cols_ = new StringArray();
 
@@ -301,7 +293,6 @@ public:
    * arrays. **/
   ~Schema() {
     for (size_t i = 0; i < width(); i++) {
-      delete types_->get(i);
       delete cols_->get(i);
     }
 
@@ -318,30 +309,13 @@ public:
    * is external. Names are expectd to be unique, duplicates result
    * in undefined behavior. */
   void add_column(char typ, String *name) {
-    char *type = new char[2];
-    type[0] = typ;
-    type[1] = '\0';
-
-    String *s = new String(type);
-    types_->push_back(s);
-    delete[] type;
-
-    if (name == nullptr) {
-      cols_->push_back(name);
-    } else {
-      cols_->push_back(name->clone());
-    }
+    types_->push_back(typ);
+    cols_->push_back(Util::clone(name));
   }
 
   /** Add a row with a name (possibly nullptr), name is external.  Names
    * are expectd to be unique, duplicates result in undefined behavior. */
-  void add_row(String *name) {
-    if (name == nullptr) {
-      rows_->push_back(nullptr);
-    } else {
-      rows_->push_back(name->clone());
-    }
-  }
+  void add_row(String *name) { rows_->push_back(Util::clone(name)); }
 
   /** Return name of row at idx; nullptr indicates no name. An idx >=
    * width is undefined. */
@@ -352,28 +326,22 @@ public:
   String *col_name(size_t idx) { return cols_->get(idx); }
 
   /** Return type of column at idx. An idx >= width is undefined. */
-  char col_type(size_t idx) { return types_->get(idx)->at(0); }
+  char col_type(size_t idx) { return types_->get(idx); }
 
   /** Given a column name return its index, or -1. */
   int col_idx(const char *name) {
-    String *s = new String(name);
-    size_t idx = cols_->index_of(s);
-    if (idx < cols_->size()) {
-      return idx;
-    }
+    String s(name);
+    size_t idx;
 
-    delete s;
-    return -1;
+    return ((idx = cols_->index_of(&s)) < width()) ? idx : -1;
   }
 
   /** Given a row name return its index, or -1. */
   int row_idx(const char *name) {
     String s(name);
-    size_t idx = rows_->index_of(&s);
-    if (idx < rows_->size()) {
-      return idx;
-    }
-    return -1;
+    size_t idx;
+
+    return ((idx = rows_->index_of(&s)) < width()) ? idx : -1;
   }
 
   /** The number of columns */
@@ -392,19 +360,9 @@ public:
 
   /** Schema equality is purely based on column type. **/
   bool equals(Object *other) {
-    if (other == nullptr)
-      return false;
     Schema *that = dynamic_cast<Schema *>(other);
-    if (that == nullptr)
-      return false;
-    if (this->width() != that->width())
-      return false;
-    for (size_t i = 0; i < this->width(); i++) {
-      if (col_type(i) != that->col_type(i)) {
-        return false;
-      }
-    }
-    return true;
+    return (that != nullptr) && (this->width() == that->width()) &&
+           types_->equals(that->types_);
   }
 
   /** Hash function is redefined st. if two schemas are equal,
