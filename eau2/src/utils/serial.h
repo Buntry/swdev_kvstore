@@ -7,12 +7,23 @@
 #include "pack.h"
 
 /** Represents the types of messages a node can send over the network. **/
-enum class MsgKind { Status, Kill, Register, Directory };
+enum class MsgKind {
+  Ack,
+  Nack,
+  Put,
+  Reply,
+  Get,
+  WaitAndGet,
+  Status,
+  Kill,
+  Register,
+  Directory
+};
 
 /** Represents a String Array that is serializable.
  * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
 class SerializableStringArray : public StringArray {
- public:
+public:
   void encode(unsigned char *&bytes) {
     packst(bytes, size());
     for (size_t i = 0; i < size(); i++) {
@@ -45,7 +56,7 @@ class SerializableStringArray : public StringArray {
 /** Represents a IntArray that is serializable.
  * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
 class SerializableIntArray : public IntArray {
- public:
+public:
   void encode(unsigned char *&bytes) {
     packst(bytes, size());
     for (size_t i = 0; i < size(); i++) {
@@ -56,7 +67,7 @@ class SerializableIntArray : public IntArray {
   size_t num_bytes() { return sizeof(size_t) + (sizeof(int) * size()); }
 
   void decode(unsigned char *&bytes) {
-    clear();  // Clear the array and push back all the doubles from bytes.
+    clear(); // Clear the array and push back all the doubles from bytes.
     size_t len = unpackst(bytes);
     for (size_t i = 0; i < len; i++) {
       push_back(unpacki(bytes));
@@ -67,7 +78,7 @@ class SerializableIntArray : public IntArray {
 /** Represents a DoubleArray that is serializable.
  * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
 class SerializableDoubleArray : public DoubleArray {
- public:
+public:
   void encode(unsigned char *&bytes) {
     packst(bytes, size());
     for (size_t i = 0; i < size(); i++) {
@@ -78,7 +89,7 @@ class SerializableDoubleArray : public DoubleArray {
   size_t num_bytes() { return sizeof(size_t) + (sizeof(double) * size()); }
 
   void decode(unsigned char *&bytes) {
-    clear();  // Clear the array and push back all the doubles from bytes.
+    clear(); // Clear the array and push back all the doubles from bytes.
     size_t len = unpackst(bytes);
     for (size_t i = 0; i < len; i++) {
       push_back(unpackd(bytes));
@@ -89,7 +100,7 @@ class SerializableDoubleArray : public DoubleArray {
 /** Represents a message.
  *  @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
 class Message : public Object {
- public:
+public:
   MsgKind kind_;
   size_t sender_;
   size_t target_;
@@ -121,11 +132,19 @@ class Message : public Object {
 /** Represents all the information needed to register.
  * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
 class Register : public Message {
- public:
+public:
   sockaddr_in client;
   size_t port;
 
-  Register() { kind_ = MsgKind::Register; }
+  Register() {
+    kind_ = MsgKind::Register;
+    port = 0;
+  }
+
+  void set(sockaddr_in c, size_t p) {
+    client = c;
+    port = p;
+  }
 
   void encode(unsigned char *&bytes) {
     Message::encode(bytes);
@@ -149,34 +168,11 @@ class Register : public Message {
   }
 };
 
-/** Represents a status upodate.
- * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
-class Status : public Message {
- public:
-  String *msg;
-  Status() { kind_ = MsgKind::Status; }
-  void set(String *s) { msg = s; }
-
-  void encode(unsigned char *&bytes) {
-    Message::encode(bytes);
-    packs(bytes, msg);
-  }
-
-  size_t num_bytes() {
-    return Message::num_bytes() + sizeof(size_t) + msg->size() + 1;
-  }
-
-  void decode(unsigned char *&bytes) {
-    Message::decode(bytes);
-    msg = unpacks(bytes);
-  }
-};
-
 /** Represents a Directory of node addresses. A Directory owns the strings
  * inside of it.
  * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
 class Directory : public Message {
- public:
+public:
   SerializableStringArray addresses;
   SerializableIntArray ports;
   size_t clients;
@@ -190,6 +186,12 @@ class Directory : public Message {
     for (size_t i = 0; i < clients; i++) {
       delete addresses.get(i);
     }
+  }
+
+  void add(String *address, int port) {
+    addresses.push_back(address);
+    ports.push_back(port);
+    clients++;
   }
 
   void encode(unsigned char *&bytes) {
@@ -210,48 +212,179 @@ class Directory : public Message {
     addresses.decode(bytes);
     ports.decode(bytes);
   }
+};
 
-  void add(String *address, int port) {
-    addresses.push_back(address);
-    ports.push_back(port);
-    clients++;
+/** Represents an Ack: an acknowledgement Message
+ * that a message was properly received.
+ * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
+class Ack : public Message {
+public:
+  Ack() { kind_ = MsgKind::Ack; }
+};
+
+/** Represents an Nack: a message that indicates
+ * that an expected message was never received.
+ * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
+class Nack : public Message {
+public:
+  Nack() { kind_ = MsgKind::Nack; }
+};
+
+/** Represents a Put: a message to be sent
+ * to another client.
+ * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
+class Put : public Message {
+public:
+  String *msg_;
+
+  Put() {
+    kind_ = MsgKind::Put;
+    msg_ = nullptr;
   }
 
-  void override(Directory &dir) {
-    for (size_t i = 0; i < clients; i++) {
-      delete addresses.get(i);
-    }
-    addresses.clear();
-    ports.clear();
+  ~Put() { delete msg_; }
 
-    for (size_t i = 0; i < dir.clients; i++) {
-      addresses.push_back(dir.addresses.get(i)->clone());
-      ports.push_back(dir.ports.get(i));
+  void set(String *msg) { msg_ = msg; }
+
+  void encode(unsigned char *&bytes) {
+    Message::encode(bytes);
+    packs(bytes, msg_);
+  }
+
+  size_t num_bytes() {
+    size_t num = Message::num_bytes();
+    if (msg_ == nullptr) {
+      num++;
+    } else {
+      num += sizeof(size_t) + msg_->size() + 1;
     }
-    clients = dir.clients;
+
+    return num;
+  }
+
+  void decode(unsigned char *&bytes) {
+    Message::decode(bytes);
+    msg_ = unpacks(bytes);
   }
 };
 
-/** Unpack a message from a buffer **/
-Message *message_from(unsigned char *&bytes) {
-  unsigned char *type_buf = bytes;
-  MsgKind k = static_cast<MsgKind>(unpackst(type_buf));
-  Message *m;
-  switch (k) {
-    case MsgKind::Register:
-      m = new Register();
-      m->decode(bytes);
-      return m;
-    case MsgKind::Directory:
-      m = new Directory();
-      m->decode(bytes);
-      return m;
-    case MsgKind::Status:
-      m = new Status();
-      m->decode(bytes);
-      return m;
-    default:
-      break;
+/** Represents a Reply: a message that is sent
+ * in response to a message received from a client.
+ * @author: griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
+class Reply : public Message {
+public:
+  String *msg_;
+
+  Reply() {
+    kind_ = MsgKind::Reply;
+    msg_ = nullptr;
   }
-  return nullptr;
-}
+
+  ~Reply() { delete msg_; }
+
+  void set(String *msg) { msg_ = msg; }
+
+  void encode(unsigned char *&bytes) {
+    Message::encode(bytes);
+    packs(bytes, msg_);
+  }
+
+  size_t num_bytes() {
+    size_t num = Message::num_bytes();
+    if (msg_ == nullptr) {
+      num++;
+    } else {
+      num += sizeof(size_t) + msg_->size() + 1;
+    }
+
+    return num;
+  }
+
+  void decode(unsigned char *&bytes) {
+    Message::decode(bytes);
+    msg_ = unpacks(bytes);
+  }
+};
+
+/** Represents a Get: a message that is sent
+ * and indicates a request to receive a message from a
+ * specific client
+ * @author: griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
+class Get : public Message {
+public:
+  Get() { kind_ = MsgKind::Get; }
+};
+
+/** Represents a WaitAndGet: a message that is sent
+ * that indicates it wishes to receive a message from a
+ * client after a specified wait period (in ms)..
+ * @author: griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
+class WaitAndGet : public Message {
+public:
+  size_t wait_ms_;
+
+  WaitAndGet() {
+    kind_ = MsgKind::WaitAndGet;
+    wait_ms_ = 0;
+  }
+
+  void set(size_t wait_ms) { wait_ms_ = wait_ms; }
+
+  void encode(unsigned char *&bytes) {
+    Message::encode(bytes);
+    packst(bytes, wait_ms_);
+  }
+
+  size_t num_bytes() { return Message::num_bytes() + sizeof(size_t); }
+
+  void decode(unsigned char *&bytes) {
+    Message::decode(bytes);
+    wait_ms_ = unpackst(bytes);
+  }
+};
+
+/** Represents a Status: a message that a client
+ * emits to the Server.
+ * @author: griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
+class Status : public Message {
+public:
+  String *msg_; // Owned
+
+  Status() {
+    kind_ = MsgKind::Status;
+    msg_ = nullptr;
+  }
+
+  ~Status() { delete msg_; }
+
+  void set(String *msg) { msg_ = msg; }
+
+  void encode(unsigned char *&bytes) {
+    Message::encode(bytes);
+    packs(bytes, msg_);
+  }
+
+  size_t num_bytes() {
+    size_t num = Message::num_bytes();
+    if (msg_ == nullptr) {
+      num++;
+    } else {
+      num += sizeof(size_t) + msg_->size() + 1;
+    }
+
+    return num;
+  }
+
+  void decode(unsigned char *&bytes) {
+    Message::decode(bytes);
+    msg_ = unpacks(bytes);
+  }
+};
+
+/** Represents a Kill: a message that indicates
+ * a request to stop the Node and exit.
+ * @author: griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
+class Kill : public Message {
+public:
+  Kill() { kind_ = MsgKind::Kill; }
+};
