@@ -10,6 +10,7 @@ class DataFrameSpeedTest : public ::testing::Test {
 public:
   DataFrame *df;
   int true_answer, xor_answer;
+  size_t LIMIT = 1000; // change this number to decrease time of the testing
 
   void SetUp() {
     Schema s("I");
@@ -18,7 +19,7 @@ public:
     xor_answer = 0;
 
     Row r(df->get_schema());
-    for (int i = 0; i < 10000000; i++) {
+    for (int i = 0; i < LIMIT; i++) {
       true_answer += i;
       xor_answer ^= i;
       r.set(0, i);
@@ -99,25 +100,25 @@ public:
   Rower *clone() { return new XORAllRower(); }
 };
 
-TEST_F(DataFrameSpeedTest, MapAtTenMillion) {
+TEST_F(DataFrameSpeedTest, SumMapAtLarge) {
   AddAllRower aar;
   df->map(aar);
   ASSERT_EQ(true_answer, aar.sum());
 }
 
-TEST_F(DataFrameSpeedTest, PMapAtTenMillion) {
+TEST_F(DataFrameSpeedTest, SumPMapAtLarge) {
   AddAllRower aar;
   df->pmap(aar);
   ASSERT_EQ(true_answer, aar.sum());
 }
 
-TEST_F(DataFrameSpeedTest, XORMapAtTenMillion) {
+TEST_F(DataFrameSpeedTest, XORMapAtLarge) {
   XORAllRower aar;
   df->map(aar);
   ASSERT_EQ(xor_answer, aar.sum());
 }
 
-TEST_F(DataFrameSpeedTest, XORPMapAtTenMillion) {
+TEST_F(DataFrameSpeedTest, XORPMapAtLarge) {
   XORAllRower aar;
   df->pmap(aar);
   ASSERT_EQ(xor_answer, aar.sum());
