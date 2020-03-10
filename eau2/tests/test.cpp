@@ -7,6 +7,7 @@
 #include "test-row.h"
 #include "test-rower.h"
 #include "test-schema.h"
+#include "test-serial.h"
 #include "test-string.h"
 #include "test-util.h"
 #include <gtest/gtest.h>
