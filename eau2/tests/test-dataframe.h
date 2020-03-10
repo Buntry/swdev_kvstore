@@ -290,6 +290,6 @@ TEST_F(DataFrameTest, GetLastElement) {
     df.add_row(r);
   }
 
-  String *fb = new String("Foobar");
-  ASSERT(fb->equals(df.get_string(0, 9)));
+  String fb("Foobar");
+  ASSERT(fb.equals(df.get_string(0, 9)));
 }

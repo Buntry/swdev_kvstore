@@ -3,7 +3,7 @@
 
 #include "object.h"
 
-// static const double DOUBLE_TOLERANCE = 0.0001;
+static const double DOUBLE_TOLERANCE = 0.0001;
 
 class Util : public Object {
 public:
