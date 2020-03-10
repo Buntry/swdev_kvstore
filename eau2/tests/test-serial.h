@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../src/serial.h"
+#include "../src/client/message.h"
 #include "test-macros.h"
 #include <gtest/gtest.h>
 
