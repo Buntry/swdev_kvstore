@@ -1,7 +1,7 @@
 // lang: CwC
 #pragma once
 
-#include "../src/object.h"
+#include "../src/utils/object.h"
 #include "test-macros.h"
 #include <gtest/gtest.h>
 
