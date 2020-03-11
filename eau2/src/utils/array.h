@@ -179,6 +179,7 @@ generate_classarray(CharArray, char);
     virtual Klass *get(size_t index) {                    \
       return dynamic_cast<Klass *>(Array::get(index));    \
     }                                                     \
+    using Array::set;                                     \
     virtual Klass *set(size_t index, Klass *v) {          \
       return dynamic_cast<Klass *>(Array::set(index, v)); \
     }                                                     \
