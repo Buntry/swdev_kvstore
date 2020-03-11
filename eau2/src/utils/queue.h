@@ -1,9 +1,10 @@
 // lang::CwC
 #pragma once
 
+#include <cstdlib>
+
 #include "object.h"
 #include "string.h"
-#include <cstdlib>
 
 /**
  * Queue: Represents a FIFO data structure.
@@ -15,7 +16,7 @@
  * implementors: griep.p@husky.neu.edu && colabella.a@husky.neu.edu
  */
 class Queue : public Object {
-public:
+ public:
   size_t size_;
   size_t num_elements_;
   size_t start_pos_;
@@ -38,8 +39,7 @@ public:
   // Resizes the given queue to the new size,
   // preserving elements that were most recently added.
   void resize_to_(size_t new_size) {
-    if (size_ == new_size)
-      return;
+    if (size_ == new_size) return;
 
     Object **new_elements_ = new Object *[new_size];
     size_t num_deleted = 0;
@@ -86,8 +86,7 @@ public:
   // returns the object at the end of this queue but does not remove it.
   // errors if there is nothing in the queue
   virtual Object *peek() {
-    if (num_elements_ == 0)
-      exit(1);
+    if (num_elements_ == 0) exit(1);
     return elements_[start_pos_];
   }
 
@@ -98,10 +97,8 @@ public:
   // in the same order, are equal to o's
   virtual bool equals(Object *other) {
     Queue *q = dynamic_cast<Queue *>(other);
-    if (q == nullptr)
-      return false;
-    if (q->len() != this->len())
-      return false;
+    if (q == nullptr) return false;
+    if (q->len() != this->len()) return false;
 
     for (size_t i = 0; i < len(); i++) {
       if (!q->elements_[offset_(i)]->equals(this->elements_[offset_(i)])) {
@@ -131,7 +128,7 @@ public:
  * implementors: griep.p@husky.neu.edu && colabella.a@husky.neu.edu
  */
 class StringQueue : public Queue {
-public:
+ public:
   String *peek() { return dynamic_cast<String *>(Queue::peek()); }
   String *pop() { return dynamic_cast<String *>(Queue::pop()); }
 };

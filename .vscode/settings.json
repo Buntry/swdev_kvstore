@@ -56,7 +56,8 @@
     "stdexcept": "cpp",
     "streambuf": "cpp",
     "thread": "cpp",
-    "typeinfo": "cpp"
+    "typeinfo": "cpp",
+    "filesystem": "cpp"
   },
   "editor.trimAutoWhitespace": true,
   "[cpp]": {
