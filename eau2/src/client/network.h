@@ -52,7 +52,7 @@ public:
     while (running) {
       while (read(socket_, message, MSG_SIZE) > 0) {
         lock_->lock();
-        unsigned char *buf = reinterpret_cast<unsigned char *>(message);
+        char *buf = reinterpret_cast<char *>(message);
         mq_->push(message_from(buf));
         lock_->unlock();
       }
@@ -147,7 +147,7 @@ public:
       lock_->lock();
       if (id_ == 0) {
         read(*curr, message, MSG_SIZE);
-        unsigned char *buf = reinterpret_cast<unsigned char *>(message);
+        char *buf = reinterpret_cast<char *>(message);
         Message *m = message_from(buf);
         m->init(m->sender_, m->target_, *curr);
         message_queue_->push(m);
@@ -278,7 +278,7 @@ public:
     assert(r.num_bytes() <= MSG_SIZE);
 
     char message[MSG_SIZE] = {0};
-    unsigned char *buf = reinterpret_cast<unsigned char *>(message);
+    char *buf = reinterpret_cast<char *>(message);
     r.encode(buf);
 
     // Send the registration message.
@@ -287,7 +287,7 @@ public:
     // Wait for the directory message back.
     read(curr, message, MSG_SIZE);
 
-    unsigned char *read = reinterpret_cast<unsigned char *>(message);
+    char *read = reinterpret_cast<char *>(message);
     handle_msg(message_from(read));
 
     // Afterwards, say hello to the next door neighbor.
@@ -363,7 +363,7 @@ public:
   void send_msg(Message *m) {
     assert(m != nullptr);
     char message[MSG_SIZE] = {0};
-    unsigned char *buf = reinterpret_cast<unsigned char *>(message);
+    char *buf = reinterpret_cast<char *>(message);
     m->encode(buf);
     send(get_socket(m->target_), message, MSG_SIZE, 0);
   }

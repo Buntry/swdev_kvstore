@@ -4,20 +4,20 @@
 #include "string.h"
 
 /** Advance the buffer by the given amount. **/
-void advance(unsigned char *&bytes, size_t amt) {
+void advance(char *&bytes, size_t amt) {
   for (size_t i = 0; i < amt; i++) {
     bytes++;
   }
 }
 
 /** Pack doubles into a buffer. **/
-void packd(unsigned char *&bytes, double d) {
+void packd(char *&bytes, double d) {
   memcpy(bytes, &d, sizeof(double));
   advance(bytes, sizeof(double));
 }
 
 /** Unpack a double from a buffer. **/
-double unpackd(unsigned char *&bytes) {
+double unpackd(char *&bytes) {
   double d;
   memcpy(&d, bytes, sizeof(double));
   advance(bytes, sizeof(double));
@@ -25,13 +25,13 @@ double unpackd(unsigned char *&bytes) {
 }
 
 /** Pack an integer from a buffer. **/
-void packi(unsigned char *&bytes, int i) {
+void packi(char *&bytes, int i) {
   memcpy(bytes, &i, sizeof(int));
   advance(bytes, sizeof(int));
 }
 
 /** Unpack an integer from a buffer. **/
-int unpacki(unsigned char *&bytes) {
+int unpacki(char *&bytes) {
   int i;
   memcpy(&i, bytes, sizeof(int));
   advance(bytes, sizeof(int));
@@ -39,13 +39,13 @@ int unpacki(unsigned char *&bytes) {
 }
 
 /** Pack a size_t into a buffer. **/
-void packst(unsigned char *&bytes, size_t st) {
+void packst(char *&bytes, size_t st) {
   memcpy(bytes, &st, sizeof(size_t));
   advance(bytes, sizeof(size_t));
 }
 
 /** Unpack a size_t from a buffer. **/
-size_t unpackst(unsigned char *&bytes) {
+size_t unpackst(char *&bytes) {
   size_t st;
   memcpy(&st, bytes, sizeof(size_t));
   advance(bytes, sizeof(size_t));
@@ -53,7 +53,7 @@ size_t unpackst(unsigned char *&bytes) {
 }
 
 /** Pack a string into a buffer. **/
-void packs(unsigned char *&bytes, String *s) {
+void packs(char *&bytes, String *s) {
   if (s == nullptr) {
     *bytes++ = '\0';
     return;
@@ -65,7 +65,7 @@ void packs(unsigned char *&bytes, String *s) {
 }
 
 /** Unpacks a string from a buffer. **/
-String *unpacks(unsigned char *&bytes) {
+String *unpacks(char *&bytes) {
   if (*bytes == '\0') {
     bytes++;
     return nullptr;
