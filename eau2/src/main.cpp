@@ -1,16 +1,13 @@
-#include "array.h"
-#include "dataframe.h"
+#include "utils/queue.h"
 
 int main() {
-  Schema s("S");
-  DataFrame df(s);
+  String s("Charlene");
+  StringQueue sq;
 
-  Row r(s);
-  for (size_t i = 0; i < 10; i++) {
-    r.set(0, new String("Foobar"));
-    df.add_row(r);
+  for (size_t i = 0; i < 100 * 1000; i++) {
+    sq.push(&s);
+    sq.push(&s);
+    sq.push(&s);
+    assert(s.equals(sq.pop()));
   }
-
-  String fb("Foobar");
-  assert(fb.equals(df.get_string(0, 9)));
 }

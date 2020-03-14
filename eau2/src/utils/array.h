@@ -33,45 +33,38 @@ static const size_t CHUNK_SIZE = 1024;
       delete[] elements_;                                                      \
     }                                                                          \
                                                                                \
-    void _resize_to_(size_t new_capacity) {                                    \
-      if ((new_capacity / CHUNK_SIZE) <= num_chunks_) {                        \
+    void grow_to_fit_(size_t num_elements) {                                   \
+      if (num_elements <= capacity_)                                           \
         return;                                                                \
-      }                                                                        \
-      size_t new_num_chunks = (new_capacity / CHUNK_SIZE) + 1;                 \
+      size_t new_num_chunks = ((num_elements * 2) / CHUNK_SIZE) + 1;           \
+      if (new_num_chunks <= num_chunks_)                                       \
+        return;                                                                \
       Stores **new_elements = new Stores *[new_num_chunks];                    \
-      for (size_t i = 0; i < num_chunks_; i++) {                               \
-        if (i < new_num_chunks) {                                              \
-          new_elements[i] = elements_[i];                                      \
+      for (size_t i = 0; i < new_num_chunks; i++) {                            \
+        if (i < num_chunks_) {                                                 \
+          new_elements[i] = elements_[chunk_offset_(i)];                       \
         } else {                                                               \
-          delete[] elements_[i];                                               \
+          new_elements[i] = new Stores[CHUNK_SIZE];                            \
         }                                                                      \
       }                                                                        \
-      for (size_t i = num_chunks_; i < new_num_chunks; i++) {                  \
-        new_elements[i] = new Stores[CHUNK_SIZE];                              \
+      for (size_t i = 0; i < CHUNK_SIZE; i++) {                                \
+        new_elements[num_chunks_][i] = elements_[chunk_offset_(0)][i];         \
       }                                                                        \
       delete[] elements_;                                                      \
       elements_ = new_elements;                                                \
       capacity_ = CHUNK_SIZE * new_num_chunks;                                 \
       num_chunks_ = new_num_chunks;                                            \
-      if (num_elements_ >= capacity_) {                                        \
-        num_elements_ -= (num_elements_ - capacity_);                          \
-      }                                                                        \
-    }                                                                          \
-                                                                               \
-    void _grow_to_fit_(size_t num_elements) {                                  \
-      if (num_elements > capacity_) {                                          \
-        _resize_to_(num_elements * 2);                                         \
-      }                                                                        \
+      start_pos_ %= CHUNK_SIZE;                                                \
     }                                                                          \
                                                                                \
     virtual void push_back(Stores e) { add(num_elements_, e); }                \
                                                                                \
     virtual void add(size_t index, Stores e) {                                 \
-      _grow_to_fit_(num_elements_ + 1);                                        \
+      grow_to_fit_(num_elements_ + 1);                                         \
       for (size_t i = num_elements_; i > index; i--) {                         \
-        elements_[_row(i)][_col(i)] = elements_[_row(i - 1)][_col(i - 1)];     \
+        elements_[row_(i)][col_(i)] = elements_[row_(i - 1)][col_(i - 1)];     \
       }                                                                        \
-      elements_[_row(index)][_col(index)] = e;                                 \
+      elements_[row_(index)][col_(index)] = e;                                 \
       num_elements_++;                                                         \
     }                                                                          \
                                                                                \
@@ -80,22 +73,19 @@ static const size_t CHUNK_SIZE = 1024;
     virtual void add_all(size_t index, KlassArray *c) {                        \
       size_t len = c->size();                                                  \
       size_t temp_num_elements = num_elements_;                                \
-      _grow_to_fit_(num_elements_ + len);                                      \
+      grow_to_fit_(num_elements_ + len);                                       \
       for (size_t i = num_elements_ + len; i > index + len; i--) {             \
         size_t shift = i - len;                                                \
-        elements_[_row(i)][_col(i)] = elements_[_row(shift)][_col(shift)];     \
+        elements_[row_(i)][col_(i)] = elements_[row_(shift)][col_(shift)];     \
       }                                                                        \
       for (size_t i = index; i - index < len; i++) {                           \
-        elements_[_row(i)][_col(i)] = c->get(i - index);                       \
+        elements_[row_(i)][col_(i)] = c->get(i - index);                       \
         temp_num_elements++;                                                   \
       }                                                                        \
       num_elements_ = temp_num_elements;                                       \
     }                                                                          \
                                                                                \
-    virtual void clear() {                                                     \
-      _resize_to_(0);                                                          \
-      num_elements_ = 0;                                                       \
-    }                                                                          \
+    virtual void clear() { num_elements_ = 0; }                                \
                                                                                \
     virtual bool equals(Object *o) {                                           \
       KlassArray *that = dynamic_cast<KlassArray *>(o);                        \
@@ -112,10 +102,16 @@ static const size_t CHUNK_SIZE = 1024;
     }                                                                          \
                                                                                \
     virtual Stores get(size_t index) {                                         \
-      return elements_[_row(index)][_col(index)];                              \
+      return elements_[row_(index)][col_(index)];                              \
     }                                                                          \
-    virtual size_t _row(size_t index) { return index / CHUNK_SIZE; }           \
-    virtual size_t _col(size_t index) { return index % CHUNK_SIZE; }           \
+    virtual size_t offset_(size_t index) {                                     \
+      return (index + start_pos_) % capacity_;                                 \
+    }                                                                          \
+    virtual size_t chunk_offset_(size_t chunk_index) {                         \
+      return (row_(0) + chunk_index) % num_chunks_;                            \
+    }                                                                          \
+    virtual size_t row_(size_t index) { return offset_(index) / CHUNK_SIZE; }  \
+    virtual size_t col_(size_t index) { return offset_(index) % CHUNK_SIZE; }  \
                                                                                \
     virtual size_t hash() {                                                    \
       size_t hash = 0;                                                         \
@@ -137,7 +133,7 @@ static const size_t CHUNK_SIZE = 1024;
     virtual Stores remove(size_t index) {                                      \
       Stores old = get(index);                                                 \
       for (size_t i = index; i < num_elements_; i++) {                         \
-        elements_[_row(i)][_col(i)] = elements_[_row(i + 1)][_col(i + 1)];     \
+        elements_[row_(i)][col_(i)] = elements_[row_(i + 1)][col_(i + 1)];     \
       }                                                                        \
       num_elements_--;                                                         \
       return old;                                                              \
@@ -145,7 +141,7 @@ static const size_t CHUNK_SIZE = 1024;
                                                                                \
     virtual Stores set(size_t index, Stores e) {                               \
       Stores old = get(index);                                                 \
-      elements_[_row(index)][_col(index)] = e;                                 \
+      elements_[row_(index)][col_(index)] = e;                                 \
       return old;                                                              \
     }                                                                          \
                                                                                \
@@ -173,6 +169,7 @@ generate_classarray(CharArray, char);
     virtual Klass *get(size_t index) {                                         \
       return dynamic_cast<Klass *>(Array::get(index));                         \
     }                                                                          \
+    using Array::set;                                                          \
     virtual Klass *set(size_t index, Klass *v) {                               \
       return dynamic_cast<Klass *>(Array::set(index, v));                      \
     }                                                                          \
