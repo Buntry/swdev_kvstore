@@ -83,3 +83,21 @@ TEST_F(QueueTest, ResizeInOneChunk) {
     ASSERT(a->equals(s));
   }
 }
+
+TEST_F(QueueTest, TestIntQueue) {
+  IntArray ia;
+  IntQueue iq;
+  int limit = 100 * 1000;
+
+  for (int i = 0; i < limit; i++) {
+    ia.push_back(i);
+  }
+  int push_index = 0, pop_index = 0;
+  while (pop_index < limit) {
+    int push_to = push_index + 2;
+    while (push_index < push_to && push_index < limit) {
+      iq.push(ia.get(push_index++));
+    }
+    ASSERT_EQ(ia.get(pop_index++), iq.pop());
+  }
+}

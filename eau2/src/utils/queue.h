@@ -9,20 +9,23 @@
  * Queue: Represents a FIFO data structure.
  *        Capable of holding any Object in the given order.
  *
- * implementors: griep.p@husky.neu.edu && colabella.a@husky.neu.edu
+ * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu
  */
-class Queue : public Array {
-public:
-  virtual void push(Object *o) { push_back(o); }
-  virtual Object *pop() {
-    Object *hold = set(0, nullptr);
-    start_pos_ = offset_(1);
-    num_elements_--;
-    return hold;
+#define generate_classqueue(KlassQueue, KlassArray, Stores)                    \
+  class KlassQueue : public KlassArray {                                       \
+  public:                                                                      \
+    virtual void push(Stores s) { push_back(s); }                              \
+    virtual Stores pop() {                                                     \
+      Stores hold = peek();                                                    \
+      start_pos_ = offset_(1);                                                 \
+      num_elements_--;                                                         \
+      return hold;                                                             \
+    }                                                                          \
+    virtual Stores peek() { return get(0); }                                   \
   }
 
-  virtual Object *peek() { return get(0); }
-};
+generate_classqueue(Queue, Array, Object *);  // Queue
+generate_classqueue(IntQueue, IntArray, int); // IntQueue
 
 #define generate_object_classqueue(KlassQueue, SubObj)                         \
   class KlassQueue : public Queue {                                            \
@@ -31,10 +34,4 @@ public:
     virtual SubObj *pop() { return dynamic_cast<SubObj *>(Queue::pop()); }     \
   }
 
-/**
- * StringQueue: Represents a FIFO data structure.
- *        Capable of holding any String in the given order.
- *
- * implementors: griep.p@husky.neu.edu && colabella.a@husky.neu.edu
- */
-generate_object_classqueue(StringQueue, String);
+generate_object_classqueue(StringQueue, String); // StringQueue
