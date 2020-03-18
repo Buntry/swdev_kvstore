@@ -3,6 +3,7 @@
 #include "test-array.h"
 #include "test-column.h"
 #include "test-dataframe.h"
+#include "test-map.h"
 #include "test-object.h"
 #include "test-pack.h"
 #include "test-pmap.h"

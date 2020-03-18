@@ -24,7 +24,7 @@ public:
   virtual Object *clone() { return nullptr; }
 
   /** Compute the hash code (subclass responsibility) */
-  virtual size_t hash_me() { return 1; };
+  virtual size_t hash_me() { return reinterpret_cast<size_t>(this); };
 
   /** Returned c_str is owned by the object, don't modify nor delete. */
   virtual char *c_str() { return nullptr; }

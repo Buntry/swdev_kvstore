@@ -40,4 +40,11 @@ public:
   static float clone(float a) { return a; }
   static double clone(double a) { return a; }
   static bool clone(bool a) { return a; }
+
+  /** Delete functions **/
+  static void destroy(Object *a) { delete a; }
+  static void destroy(int a) {}
+  static void destroy(float a) {}
+  static void destroy(double a) {}
+  static void destory(bool a) {}
 };
