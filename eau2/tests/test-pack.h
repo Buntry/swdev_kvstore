@@ -11,12 +11,12 @@
  */
 class PackTest : public ::testing::Test {
 public:
-  unsigned char *buf;
-  unsigned char *buf2;
+  char *buf;
+  char *buf2;
   size_t max_size = 1024;
 
   void SetUp() {
-    buf = new unsigned char[max_size];
+    buf = new char[max_size];
     buf2 = buf;
   }
 

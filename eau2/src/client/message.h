@@ -24,7 +24,7 @@ enum class MsgKind {
  * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
 class SerializableStringArray : public StringArray {
 public:
-  void encode(unsigned char *&bytes) {
+  void encode(char *&bytes) {
     packst(bytes, size());
     for (size_t i = 0; i < size(); i++) {
       packs(bytes, get(i));
@@ -44,7 +44,7 @@ public:
     return byte_count;
   }
 
-  void decode(unsigned char *&bytes) {
+  void decode(char *&bytes) {
     clear();
     size_t len = unpackst(bytes);
     for (size_t i = 0; i < len; i++) {
@@ -57,7 +57,7 @@ public:
  * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
 class SerializableIntArray : public IntArray {
 public:
-  void encode(unsigned char *&bytes) {
+  void encode(char *&bytes) {
     packst(bytes, size());
     for (size_t i = 0; i < size(); i++) {
       packi(bytes, get(i));
@@ -66,7 +66,7 @@ public:
 
   size_t num_bytes() { return sizeof(size_t) + (sizeof(int) * size()); }
 
-  void decode(unsigned char *&bytes) {
+  void decode(char *&bytes) {
     clear(); // Clear the array and push back all the doubles from bytes.
     size_t len = unpackst(bytes);
     for (size_t i = 0; i < len; i++) {
@@ -79,7 +79,7 @@ public:
  * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
 class SerializableDoubleArray : public DoubleArray {
 public:
-  void encode(unsigned char *&bytes) {
+  void encode(char *&bytes) {
     packst(bytes, size());
     for (size_t i = 0; i < size(); i++) {
       packd(bytes, get(i));
@@ -88,7 +88,7 @@ public:
 
   size_t num_bytes() { return sizeof(size_t) + (sizeof(double) * size()); }
 
-  void decode(unsigned char *&bytes) {
+  void decode(char *&bytes) {
     clear(); // Clear the array and push back all the doubles from bytes.
     size_t len = unpackst(bytes);
     for (size_t i = 0; i < len; i++) {
@@ -112,14 +112,14 @@ public:
     id_ = id;
   }
 
-  virtual void encode(unsigned char *&bytes) {
+  virtual void encode(char *&bytes) {
     packst(bytes, static_cast<size_t>(kind_));
     packst(bytes, sender_);
     packst(bytes, target_);
     packst(bytes, id_);
   }
 
-  virtual void decode(unsigned char *&bytes) {
+  virtual void decode(char *&bytes) {
     kind_ = static_cast<MsgKind>(unpackst(bytes));
     sender_ = unpackst(bytes);
     target_ = unpackst(bytes);
@@ -146,7 +146,7 @@ public:
     port = p;
   }
 
-  void encode(unsigned char *&bytes) {
+  void encode(char *&bytes) {
     Message::encode(bytes);
     packst(bytes, port);
     memcpy(bytes, &client.sin_addr, sizeof(client.sin_addr));
@@ -157,7 +157,7 @@ public:
     return Message::num_bytes() + sizeof(size_t) + sizeof(client.sin_addr);
   }
 
-  void decode(unsigned char *&bytes) {
+  void decode(char *&bytes) {
     Message::decode(bytes);
     port = unpackst(bytes);
 
@@ -194,7 +194,7 @@ public:
     clients++;
   }
 
-  void encode(unsigned char *&bytes) {
+  void encode(char *&bytes) {
     Message::encode(bytes);
     packst(bytes, clients);
     addresses.encode(bytes);
@@ -206,7 +206,7 @@ public:
            ports.num_bytes();
   }
 
-  void decode(unsigned char *&bytes) {
+  void decode(char *&bytes) {
     Message::decode(bytes);
     clients = unpackst(bytes);
     addresses.decode(bytes);
@@ -246,7 +246,7 @@ public:
 
   void set(String *msg) { msg_ = msg; }
 
-  void encode(unsigned char *&bytes) {
+  void encode(char *&bytes) {
     Message::encode(bytes);
     packs(bytes, msg_);
   }
@@ -262,7 +262,7 @@ public:
     return num;
   }
 
-  void decode(unsigned char *&bytes) {
+  void decode(char *&bytes) {
     Message::decode(bytes);
     msg_ = unpacks(bytes);
   }
@@ -284,7 +284,7 @@ public:
 
   void set(String *msg) { msg_ = msg; }
 
-  void encode(unsigned char *&bytes) {
+  void encode(char *&bytes) {
     Message::encode(bytes);
     packs(bytes, msg_);
   }
@@ -300,7 +300,7 @@ public:
     return num;
   }
 
-  void decode(unsigned char *&bytes) {
+  void decode(char *&bytes) {
     Message::decode(bytes);
     msg_ = unpacks(bytes);
   }
@@ -330,14 +330,14 @@ public:
 
   void set(size_t wait_ms) { wait_ms_ = wait_ms; }
 
-  void encode(unsigned char *&bytes) {
+  void encode(char *&bytes) {
     Message::encode(bytes);
     packst(bytes, wait_ms_);
   }
 
   size_t num_bytes() { return Message::num_bytes() + sizeof(size_t); }
 
-  void decode(unsigned char *&bytes) {
+  void decode(char *&bytes) {
     Message::decode(bytes);
     wait_ms_ = unpackst(bytes);
   }
@@ -359,7 +359,7 @@ public:
 
   void set(String *msg) { msg_ = msg; }
 
-  void encode(unsigned char *&bytes) {
+  void encode(char *&bytes) {
     Message::encode(bytes);
     packs(bytes, msg_);
   }
@@ -375,7 +375,7 @@ public:
     return num;
   }
 
-  void decode(unsigned char *&bytes) {
+  void decode(char *&bytes) {
     Message::decode(bytes);
     msg_ = unpacks(bytes);
   }

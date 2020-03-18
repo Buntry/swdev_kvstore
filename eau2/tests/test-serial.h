@@ -17,9 +17,9 @@ public:
   SerializableIntArray sia;
   SerializableIntArray sia_clone;
   size_t max_size = 1024;
-  unsigned char *msg;
-  unsigned char *buf;
-  unsigned char *read;
+  char *msg;
+  char *buf;
+  char *read;
   Ack a;
   Nack n;
   Put p;
@@ -32,7 +32,7 @@ public:
   Register reg;
 
   void SetUp() {
-    msg = new unsigned char[max_size];
+    msg = new char[max_size];
     buf = msg;
     read = msg;
 
