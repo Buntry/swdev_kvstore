@@ -85,6 +85,20 @@ public:
       hash = cstr_[i] + (hash << 6) + (hash << 16) - hash;
     return hash;
   }
+
+  // /** Serializes a string **/
+  // void serialize(Serializer &ser) {
+  //   for (size_t i = 0; i < size_; i++) {
+  //     ser.write(this->at(i));
+  //   }
+  // }
+
+  // /** Deserializes a string **/
+  // static String *deserialize(Deserializer &d) {
+  //   size_t len = d.read_size_t();
+  //   char *s = d.read_chars(len);
+  //   return new String(true, s, len);
+  // }
 };
 
 /** A string buffer builds a string from various pieces.

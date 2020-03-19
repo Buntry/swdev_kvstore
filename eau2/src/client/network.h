@@ -17,7 +17,7 @@
 
 #include "map.h"
 #include "queue.h"
-#include "serial.h"
+#include "serializer.h"
 #include "thread.h"
 
 static const short PORT = 8080;         // Port
@@ -27,11 +27,7 @@ static const size_t ALL_CONNECT = 2000; // Wait for all nodes to connect
 
 /** Represents a Queue of Messages.
  * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
-class MessageQueue : public Queue {
-public:
-  Message *peek() { return dynamic_cast<Message *>(Queue::peek()); }
-  Message *pop() { return dynamic_cast<Message *>(Queue::pop()); }
-};
+generate_object_classqueue(MessageQueue, Message);
 
 /** Represents a thread that listens to a socket and appends read messages
  * to a message queue.
