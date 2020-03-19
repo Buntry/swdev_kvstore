@@ -3,12 +3,15 @@
 // LANGUAGE: CwC
 
 /** Base class for all objects in the system.
- *  author: vitekj@me.com */
+ *  author: griep.p@husky.neu.edu & colabella.a@husky.neu.edu */
 class Object : public Sys {
 public:
   size_t hash_; // every object has a hash, subclasses must implement the
                 // functionality
+  // ValKind vkind_; // every object also has a value kind, so that it can be
+  // deserialized
 
+  /** Initially sets this object to null and sets its value kind to object. **/
   Object() { hash_ = 0; }
 
   /** Subclasses may have something to do on finalziation */
@@ -28,4 +31,9 @@ public:
 
   /** Returned c_str is owned by the object, don't modify nor delete. */
   virtual char *c_str() { return nullptr; }
+
+  /** Serialize this object onto a serializer. **/
+  // virtual void serialize(Serializer &ser) {
+  //   ser.write(static_cast<size_t>(vkind_));
+  // }
 };

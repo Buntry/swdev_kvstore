@@ -99,10 +99,10 @@ TEST_F(SerialTest, PutMessage) {
   p.encode(buf);
   Put p2;
   p2.decode(read);
-  ASSERT(p.target_ == 0);
-  ASSERT(p.sender_ == 0);
-  ASSERT(p.id_ == 0);
-  ASSERT(p.msg_->equals(s2));
+  ASSERT(p2.target_ == 0);
+  ASSERT(p2.sender_ == 0);
+  ASSERT(p2.id_ == 0);
+  ASSERT(p2.msg_->equals(s2));
 }
 
 TEST_F(SerialTest, ReplyMessage) {
