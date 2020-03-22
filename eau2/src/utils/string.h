@@ -86,19 +86,19 @@ public:
     return hash;
   }
 
-  // /** Serializes a string **/
-  // void serialize(Serializer &ser) {
-  //   for (size_t i = 0; i < size_; i++) {
-  //     ser.write(this->at(i));
-  //   }
-  // }
+  /** Serializes a string **/
+  void serialize(Serializer &ser) {
+    Object::serialize(ser);
+    ser.write(size() + 1);
+    ser.write(cstr_, size() + 1);
+  }
 
-  // /** Deserializes a string **/
-  // static String *deserialize(Deserializer &d) {
-  //   size_t len = d.read_size_t();
-  //   char *s = d.read_chars(len);
-  //   return new String(true, s, len);
-  // }
+  /** Deserializes a string **/
+  static String *deserialize(Deserializer &d) {
+    size_t len = d.read_size_t();
+    char *s = d.read_chars(len);
+    return new String(true, s, len - 1);
+  }
 };
 
 /** A string buffer builds a string from various pieces.
