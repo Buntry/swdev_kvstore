@@ -94,7 +94,10 @@ public:
   /** Set value at idx. An out of bound idx is undefined.  */
   void set(size_t idx, bool val) { vals_.set(idx, val); }
   size_t size() { return vals_.size(); }
-  void push_back(bool val) { vals_.push_back(val); };
+  void push_back(bool val) {
+    missing_.push_back(false);
+    vals_.push_back(val);
+  };
 
   /** Push back a dummy on missing **/
   void push_back_missing() {
@@ -166,7 +169,10 @@ public:
   /** Set value at idx. An out of bound idx is undefined.  */
   void set(size_t idx, int val) { vals_.set(idx, val); }
   size_t size() { return vals_.size(); }
-  void push_back(int val) { vals_.push_back(val); };
+  void push_back(int val) {
+    missing_.push_back(false);
+    vals_.push_back(val);
+  };
 
   /** Push back a dummy on missing **/
   void push_back_missing() {
@@ -239,7 +245,10 @@ public:
   /** Set value at idx. An out of bound idx is undefined.  */
   void set(size_t idx, float val) { vals_.set(idx, val); }
   size_t size() { return vals_.size(); }
-  void push_back(float val) { vals_.push_back(val); };
+  void push_back(float val) {
+    missing_.push_back(false);
+    vals_.push_back(val);
+  };
 
   /** Push back a dummy on missing **/
   void push_back_missing() {
@@ -337,6 +346,7 @@ public:
     if (s == nullptr) {
       push_back_missing();
     } else {
+      missing_.push_back(false);
       vals_.push_back(s->clone());
     }
   };

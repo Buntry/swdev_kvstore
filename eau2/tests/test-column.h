@@ -167,3 +167,18 @@ TEST_F(ColumnTest, PushBack) {
   ASSERT_EQ(ic->size(), 1);
   ASSERT_EQ(sc->size(), 1);
 }
+
+TEST_F(ColumnTest, TestMissing) {
+  ASSERT_EQ(nesc->size(), initial_size);
+  nesc->push_back_missing();
+  ASSERT_EQ(nesc->size(), initial_size + 1);
+
+  String *a = new String("Garfield");
+  nesc->push_back(a);
+  ASSERT_EQ(nesc->size(), initial_size + 2);
+
+  ASSERT(!nesc->is_missing(0));
+  ASSERT(nesc->is_missing(initial_size));
+  ASSERT(!nesc->is_missing(initial_size + 1));
+  delete a;
+}
