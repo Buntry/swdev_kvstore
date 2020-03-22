@@ -12,6 +12,7 @@
 #include "test-rower.h"
 #include "test-schema.h"
 #include "test-serial.h"
+#include "test-serializer.h"
 #include "test-string.h"
 #include "test-util.h"
 

@@ -1,11 +1,8 @@
 // lang: CwC
 #pragma once
 
-#include "../utils/array.h"
-#include "../utils/object.h"
-#include "../utils/string.h"
 #include "../utils/thread.h"
-#include "stdarg.h"
+#include "column.h"
 
 /** Static variable for number of rows before we consider multi-threading. **/
 /** This will also be used as a number of when to determine the amount of
@@ -14,235 +11,6 @@ static const size_t MIN_NROWS_PER_THREAD = 500000;
 
 /** This makes sure we don't go overboard with our number of threads. **/
 static const size_t MAX_NUM_THREADS = 8;
-
-/** Forward declarations to make Column Class compile. **/
-class BoolColumn;
-class IntColumn;
-class FloatColumn;
-class StringColumn;
-
-/**************************************************************************
- * Column ::
- * Represents one column of a data frame which holds values of a single type.
- * This abstract class defines methods overriden in subclasses. There is
- * one subclass per element type. Columns are mutable, equality is pointer
- * equality.
- *
- * @author griep.p@husky.neu.edu & colabella.a@husky.neu.
- * */
-class Column : public Object {
-public:
-  char type_ = '\0';
-
-  /** Type converters: Return same column under its actual type, or
-   *  nullptr if of the wrong type.  */
-  virtual IntColumn *as_int() { return nullptr; }
-  virtual BoolColumn *as_bool() { return nullptr; }
-  virtual FloatColumn *as_float() { return nullptr; }
-  virtual StringColumn *as_string() { return nullptr; }
-
-  /** Type appropriate push_back methods. Calling the wrong method is
-   * undefined behavior. **/
-  virtual void push_back(int val) { assert(false); };
-  virtual void push_back(bool val) { assert(false); };
-  virtual void push_back(float val) { assert(false); };
-  virtual void push_back(String *val) { assert(false); };
-
-  /** Returns the number of elements in the column. */
-  virtual size_t size() { return 0; }
-
-  /** Return the type of this column as a char: 'S', 'B', 'I' and 'F'. */
-  char get_type() { return this->type_; }
-
-  /** Overriding the clone method on object **/
-  virtual Column *clone() { return nullptr; }
-};
-
-/*************************************************************************
- * BoolColumn::
- * Holds primitive bool values, unwrapped.
- *
- * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu
- */
-class BoolColumn : public Column {
-public:
-  BoolArray vals_;
-
-  BoolColumn() { type_ = 'B'; }
-
-  BoolColumn(int n, ...) : BoolColumn() {
-    int i;
-    bool val;
-    va_list vl;
-
-    va_start(vl, n);
-    for (i = 0; i < n; i++) {
-      val = va_arg(vl, int);
-      push_back(val);
-    }
-    va_end(vl);
-  }
-
-  bool get(size_t idx) { return vals_.get(idx); }
-  BoolColumn *as_bool() { return this; }
-  /** Set value at idx. An out of bound idx is undefined.  */
-  void set(size_t idx, bool val) { vals_.set(idx, val); }
-  size_t size() { return vals_.size(); }
-  void push_back(bool val) { vals_.push_back(val); };
-
-  /** Object methods to satisfy requirement of being an object. **/
-  BoolColumn *clone() {
-    BoolColumn *bc = new BoolColumn();
-    bc->vals_.add_all(0, &vals_);
-    return bc;
-  }
-};
-
-/*************************************************************************
- * IntColumn::
- * Holds primitive int values, unwrapped.
- *
- * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu
- */
-class IntColumn : public Column {
-public:
-  IntArray vals_;
-
-  IntColumn() { type_ = 'I'; }
-
-  IntColumn(int n, ...) : IntColumn() {
-    int i;
-    int val;
-    va_list vl;
-
-    va_start(vl, n);
-    for (i = 0; i < n; i++) {
-      val = va_arg(vl, int);
-      push_back(val);
-    }
-    va_end(vl);
-  }
-
-  int get(size_t idx) { return vals_.get(idx); }
-  IntColumn *as_int() { return this; }
-  /** Set value at idx. An out of bound idx is undefined.  */
-  void set(size_t idx, int val) { vals_.set(idx, val); }
-  size_t size() { return vals_.size(); }
-  void push_back(int val) { vals_.push_back(val); };
-
-  /** Object methods to satisfy requirement of being an object. **/
-  IntColumn *clone() {
-    IntColumn *ic = new IntColumn();
-    ic->vals_.add_all(0, &vals_);
-    return ic;
-  }
-};
-
-/*************************************************************************
- * FloatColumn::
- * Holds primitive int values, unwrapped.
- *
- * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu
- */
-class FloatColumn : public Column {
-public:
-  FloatArray vals_;
-
-  FloatColumn() { type_ = 'F'; }
-
-  /** A variable argument constructor for passing any number of floats. **/
-  FloatColumn(int n, ...) : FloatColumn() {
-    int i;
-    float val;
-    va_list vl;
-
-    va_start(vl, n);
-    for (i = 0; i < n; i++) {
-      val = va_arg(vl, double);
-      push_back(val);
-    }
-    va_end(vl);
-  }
-
-  float get(size_t idx) { return vals_.get(idx); }
-  FloatColumn *as_float() { return this; }
-  /** Set value at idx. An out of bound idx is undefined.  */
-  void set(size_t idx, float val) { vals_.set(idx, val); }
-  size_t size() { return vals_.size(); }
-  void push_back(float val) { vals_.push_back(val); };
-
-  /** Object methods to satisfy requirement of being an object. **/
-  FloatColumn *clone() {
-    FloatColumn *fc = new FloatColumn();
-    fc->vals_.add_all(0, &vals_);
-    return fc;
-  }
-};
-
-/*************************************************************************
- * StringColumn::
- * Holds string pointers. The strings are external.  Nullptr is a valid
- * value.
- *
- * A StringColumn owns all of the Strings inside of it. This means that
- * we clone Strings if they've been passed to an external-accepting
- * function.
- *
- * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu
- */
-class StringColumn : public Column {
-public:
-  StringArray vals_;
-
-  StringColumn() { type_ = 'S'; }
-
-  /** This constructor clones its arguments.  **/
-  StringColumn(int n, ...) : StringColumn() {
-    int i;
-    String *val;
-    va_list vl;
-
-    va_start(vl, n);
-    for (i = 0; i < n; i++) {
-      val = va_arg(vl, String *);
-      push_back(val);
-    }
-    va_end(vl);
-  }
-
-  /** A String has ownership over all of its contents. Therefore,
-   * before we delete it, we need to delete all the Strings it contains. **/
-  ~StringColumn() {
-    for (size_t i = 0; i < vals_.size(); i++) {
-      delete vals_.get(i);
-    }
-  }
-
-  /** Casts this column as itself **/
-  StringColumn *as_string() { return this; }
-
-  /** Returns the string at idx; undefined on invalid idx.*/
-  String *get(size_t idx) { return vals_.get(idx); }
-
-  /** Acquire ownership of the string. Out of bound idx is undefined.
-   * Since a StrColumn clones */
-  void set(size_t idx, String *val) { delete vals_.set(idx, val); }
-
-  size_t size() { return vals_.size(); }
-
-  /** Since Strings are external unless otherwise stated, we make a clone
-   * so that we can manage its memory. **/
-  virtual void push_back(String *s) { vals_.push_back(Util::clone(s)); };
-
-  /** Object methods to satisfy requirement of being an object. **/
-  StringColumn *clone() {
-    StringColumn *sc = new StringColumn();
-    for (size_t i = 0; i < size(); i++) {
-      sc->push_back(get(i));
-    }
-    return sc;
-  }
-};
 
 /*************************************************************************
  * Schema::
@@ -412,27 +180,26 @@ public:
 class Row : public Object {
 public:
   Schema *scm_;
-  Column **cols_;
+  ColumnArray cols_;
   size_t row_idx_;
 
   /** Build a row following a schema. */
   Row(Schema &scm) {
     row_idx_ = 0;
     scm_ = new Schema(scm);
-    cols_ = new Column *[scm_->width()];
     for (size_t i = 0; i < scm_->width(); i++) {
       switch (scm_->col_type(i)) {
       case 'B':
-        cols_[i] = new BoolColumn();
+        cols_.push_back(new BoolColumn());
         break;
       case 'I':
-        cols_[i] = new IntColumn();
+        cols_.push_back(new IntColumn());
         break;
       case 'F':
-        cols_[i] = new FloatColumn();
+        cols_.push_back(new FloatColumn());
         break;
       case 'S':
-        cols_[i] = new StringColumn();
+        cols_.push_back(new StringColumn());
         break;
       }
     }
@@ -441,38 +208,37 @@ public:
   /** Destructor for a Row **/
   ~Row() {
     for (size_t i = 0; i < scm_->width(); i++) {
-      delete cols_[i];
+      delete cols_.get(i);
     }
-    delete[] cols_;
     delete scm_;
   }
 
   /** Setters: set the given column with the given value. Setting a column
    * with a value of the wrong type is undefined. */
   void set(size_t col, int val) {
-    if (cols_[col]->size() == 0) {
-      cols_[col]->as_int()->push_back(0);
+    if (cols_.get(col)->size() == 0) {
+      cols_.get(col)->as_int()->push_back(0);
     }
-    cols_[col]->as_int()->set(0, val);
+    cols_.get(col)->as_int()->set(0, val);
   }
   void set(size_t col, float val) {
-    if (cols_[col]->size() == 0) {
-      cols_[col]->as_float()->push_back(0.0f);
+    if (cols_.get(col)->size() == 0) {
+      cols_.get(col)->as_float()->push_back(0.0f);
     }
-    cols_[col]->as_float()->set(0, val);
+    cols_.get(col)->as_float()->set(0, val);
   }
   void set(size_t col, bool val) {
-    if (cols_[col]->size() == 0) {
-      cols_[col]->as_bool()->push_back(false);
+    if (cols_.get(col)->size() == 0) {
+      cols_.get(col)->as_bool()->push_back(false);
     }
-    cols_[col]->as_bool()->set(0, val);
+    cols_.get(col)->as_bool()->set(0, val);
   }
   /** Acquire ownership of the string. */
   void set(size_t col, String *val) {
-    if (cols_[col]->size() == 0) {
-      cols_[col]->push_back(nullptr);
+    if (cols_.get(col)->size() == 0) {
+      cols_.get(col)->push_back(nullptr);
     }
-    cols_[col]->as_string()->set(0, val);
+    cols_.get(col)->as_string()->set(0, val);
   }
 
   /** Set/get the index of this row (ie. its position in the dataframe.
@@ -482,10 +248,10 @@ public:
 
   /** Getters: get the value at the given column. If the column is not
    * of the requested type, the result is undefined. */
-  int get_int(size_t col) { return cols_[col]->as_int()->get(0); }
-  bool get_bool(size_t col) { return cols_[col]->as_bool()->get(0); }
-  float get_float(size_t col) { return cols_[col]->as_float()->get(0); }
-  String *get_string(size_t col) { return cols_[col]->as_string()->get(0); }
+  int get_int(size_t col) { return cols_.get(col)->as_int()->get(0); }
+  bool get_bool(size_t col) { return cols_.get(col)->as_bool()->get(0); }
+  float get_float(size_t col) { return cols_.get(col)->as_float()->get(0); }
+  String *get_string(size_t col) { return cols_.get(col)->as_string()->get(0); }
 
   /** Number of fields in the row. */
   size_t width() { return scm_->width(); }
@@ -621,7 +387,7 @@ public:
 class DataFrame : public Object {
 public:
   Schema *scm_;
-  Column **cols_;
+  ColumnArray cols_;
 
   /** Create a data frame with the same columns as the give df but no rows
    * or row names. */
@@ -631,20 +397,19 @@ public:
   DataFrame(Schema &schema) {
     scm_ = new Schema(schema);
     scm_->purge_rows();
-    cols_ = new Column *[scm_->width()];
     for (size_t i = 0; i < scm_->width(); i++) {
       switch (scm_->col_type(i)) {
       case 'B':
-        cols_[i] = new BoolColumn();
+        cols_.push_back(new BoolColumn());
         break;
       case 'I':
-        cols_[i] = new IntColumn();
+        cols_.push_back(new IntColumn());
         break;
       case 'F':
-        cols_[i] = new FloatColumn();
+        cols_.push_back(new FloatColumn());
         break;
       case 'S':
-        cols_[i] = new StringColumn();
+        cols_.push_back(new StringColumn());
         break;
       }
     }
@@ -653,9 +418,8 @@ public:
   /** Destructor for a DataFrame **/
   ~DataFrame() {
     for (size_t i = 0; i < ncols(); i++) {
-      delete cols_[i];
+      delete cols_.get(i);
     }
-    delete[] cols_;
     delete scm_;
   }
 
@@ -667,11 +431,6 @@ public:
    * is external, and appears as the last column of the dataframe, the
    * name is optional and external. A nullptr colum is undefined. */
   void add_column(Column *col, String *name) {
-    Column **new_cols = new Column *[ncols() + 1];
-    for (size_t i = 0; i < ncols(); i++) {
-      new_cols[i] = cols_[i];
-    }
-    new_cols[ncols()] = col->clone();
     // If this is our first column, grow the schema's rows to fit it.
     if (ncols() == 0) {
       for (size_t i = 0; i < col->size(); i++) {
@@ -679,21 +438,22 @@ public:
       }
     }
     scm_->add_column(col->get_type(), name);
-    delete[] cols_;
-    cols_ = new_cols;
+    cols_.push_back(col->clone());
   }
 
   /** Return the value at the given column and row. Accessing rows or
    *  columns out of bounds, or request the wrong type is undefined.*/
-  int get_int(size_t col, size_t row) { return cols_[col]->as_int()->get(row); }
+  int get_int(size_t col, size_t row) {
+    return cols_.get(col)->as_int()->get(row);
+  }
   bool get_bool(size_t col, size_t row) {
-    return cols_[col]->as_bool()->get(row);
+    return cols_.get(col)->as_bool()->get(row);
   }
   float get_float(size_t col, size_t row) {
-    return cols_[col]->as_float()->get(row);
+    return cols_.get(col)->as_float()->get(row);
   }
   String *get_string(size_t col, size_t row) {
-    return cols_[col]->as_string()->get(row);
+    return cols_.get(col)->as_string()->get(row);
   }
 
   /** Return the offset of the given column name or -1 if no such col. */
@@ -706,16 +466,16 @@ public:
    * If the column is not  of the right type or the indices are out of
    * bound, the result is undefined. */
   void set(size_t col, size_t row, int val) {
-    cols_[col]->as_int()->set(row, val);
+    cols_.get(col)->as_int()->set(row, val);
   }
   void set(size_t col, size_t row, bool val) {
-    cols_[col]->as_bool()->set(row, val);
+    cols_.get(col)->as_bool()->set(row, val);
   }
   void set(size_t col, size_t row, float val) {
-    cols_[col]->as_float()->set(row, val);
+    cols_.get(col)->as_float()->set(row, val);
   }
   void set(size_t col, size_t row, String *val) {
-    cols_[col]->as_string()->set(row, val);
+    cols_.get(col)->as_string()->set(row, val);
   }
 
   /** Set the fields of the given row object with values from the columns
@@ -753,16 +513,16 @@ public:
     for (size_t i = 0; i < ncols(); i++) {
       switch (scm_->col_type(i)) {
       case 'B':
-        cols_[i]->push_back(row.get_bool(i));
+        cols_.get(i)->push_back(row.get_bool(i));
         break;
       case 'I':
-        cols_[i]->push_back(row.get_int(i));
+        cols_.get(i)->push_back(row.get_int(i));
         break;
       case 'F':
-        cols_[i]->push_back(row.get_float(i));
+        cols_.get(i)->push_back(row.get_float(i));
         break;
       case 'S':
-        cols_[i]->push_back(row.get_string(i));
+        cols_.get(i)->push_back(row.get_string(i));
         break;
       default:
         assert(false);
