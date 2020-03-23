@@ -41,7 +41,7 @@ public:
     c = new String("Charlie");
 
     initial_size = 3;
-    nesc = new StringColumn(initial_size, a->clone(), b->clone(), c->clone());
+    nesc = new StringColumn(initial_size, a, b, c);
     nefc = new FloatColumn(initial_size, 1.02f, 2.02f, 3.02f);
     neic = new IntColumn(initial_size, -1, -2, -3);
     nebc = new BoolColumn(initial_size, true, false, true);
@@ -166,4 +166,35 @@ TEST_F(ColumnTest, PushBack) {
   ASSERT_EQ(fc->size(), 1);
   ASSERT_EQ(ic->size(), 1);
   ASSERT_EQ(sc->size(), 1);
+}
+
+TEST_F(ColumnTest, TestMissing) {
+  ASSERT_EQ(nesc->size(), initial_size);
+  nesc->push_back_missing();
+  ASSERT_EQ(nesc->size(), initial_size + 1);
+
+  String *a = new String("Garfield");
+  nesc->push_back(a);
+  ASSERT_EQ(nesc->size(), initial_size + 2);
+
+  ASSERT(!nesc->is_missing(0));
+  ASSERT(nesc->is_missing(initial_size));
+  ASSERT(!nesc->is_missing(initial_size + 1));
+  delete a;
+}
+
+TEST_F(ColumnTest, ColumnEquality) {
+  BoolColumn *nebc2 = nebc->clone();
+  ASSERT(nebc->equals(nebc2));
+  IntColumn *neic2 = neic->clone();
+  ASSERT(neic->equals(neic2));
+  FloatColumn *nefc2 = nefc->clone();
+  ASSERT(nefc->equals(nefc2));
+  StringColumn *nesc2 = nesc->clone();
+  ASSERT(nesc->equals(nesc2));
+
+  delete nebc2;
+  delete neic2;
+  delete nefc2;
+  delete nesc2;
 }
