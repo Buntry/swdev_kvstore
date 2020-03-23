@@ -41,6 +41,7 @@ public:
   /** Deals with allowing missing values. **/
   virtual void push_back_missing() { missing_.push_back(true); }
   bool is_missing(size_t i) { return missing_.get(i); }
+  void set_missing(size_t i) { missing_.set(i, true); }
 
   /** Returns the number of elements in the column. */
   virtual size_t size() { return missing_.size(); }
@@ -113,11 +114,21 @@ public:
     return bc;
   }
 
+  /** Does the given boolean column match the given object. **/
+  bool equals(Object *o) {
+    BoolColumn *that = dynamic_cast<BoolColumn *>(o);
+    return (that != nullptr) && (vals_.equals(&that->vals_));
+  }
+
+  /** Gets the hash of this boolean column **/
+  size_t hash() { return vals_.hash(); }
+
   /** Serializes this column onto the given serializer object. **/
   virtual void serialize(Serializer &ser) {
     Column::serialize(ser);
     for (size_t i = 0; i < size(); i++)
-      ser.write(get(i));
+      if (!is_missing(i))
+        ser.write(get(i));
   }
 
   /** Deserializes a BoolColumn from the given deserializer object. **/
@@ -188,11 +199,21 @@ public:
     return ic;
   }
 
+  /** Does the given integer column match the given object. **/
+  bool equals(Object *o) {
+    IntColumn *that = dynamic_cast<IntColumn *>(o);
+    return (that != nullptr) && (vals_.equals(&that->vals_));
+  }
+
+  /** Gets the hash of this integer column **/
+  size_t hash() { return vals_.hash(); }
+
   /** Serializes this column onto the given serializer object. **/
   virtual void serialize(Serializer &ser) {
     Column::serialize(ser);
     for (size_t i = 0; i < size(); i++)
-      ser.write(get(i));
+      if (!is_missing(i))
+        ser.write(get(i));
   }
 
   /** Deserializes a IntColumn from the given deserializer object. **/
@@ -264,11 +285,21 @@ public:
     return fc;
   }
 
+  /** Does the given float column match the given object. **/
+  bool equals(Object *o) {
+    FloatColumn *that = dynamic_cast<FloatColumn *>(o);
+    return (that != nullptr) && (vals_.equals(&that->vals_));
+  }
+
+  /** Gets the hash of this float column **/
+  size_t hash() { return vals_.hash(); }
+
   /** Serializes this column onto the given serializer object. **/
   virtual void serialize(Serializer &ser) {
     Column::serialize(ser);
     for (size_t i = 0; i < size(); i++)
-      ser.write(get(i));
+      if (!is_missing(i))
+        ser.write(get(i));
   }
 
   /** Deserializes a FloatColumn from the given deserializer object. **/
@@ -337,7 +368,11 @@ public:
 
   /** Acquire ownership of the string. Out of bound idx is undefined.
    * Since a StrColumn clones */
-  void set(size_t idx, String *val) { delete vals_.set(idx, val); }
+  void set(size_t idx, String *val) {
+    delete vals_.set(idx, val);
+    missing_.set(idx, val == nullptr);
+  }
+
   size_t size() { return vals_.size(); }
 
   /** Since Strings are external unless otherwise stated, we make a clone
@@ -372,11 +407,21 @@ public:
     return sc;
   }
 
+  /** Does the given string column match the given object. **/
+  bool equals(Object *o) {
+    StringColumn *that = dynamic_cast<StringColumn *>(o);
+    return (that != nullptr) && (vals_.equals(&that->vals_));
+  }
+
+  /** Gets the hash of this string column **/
+  size_t hash() { return vals_.hash(); }
+
   /** Serializes this column onto the given serializer object. **/
   virtual void serialize(Serializer &ser) {
     Column::serialize(ser);
     for (size_t i = 0; i < size(); i++)
-      ser.write(get(i));
+      if (!is_missing(i))
+        ser.write(get(i));
   }
 
   /** Deserializes a StringColumn from the given deserializer object. **/
@@ -399,9 +444,8 @@ public:
 };
 
 /** Deserializes a column of the correct type. **/
-static Column *deserialize(Deserializer &dser) {
-  char type = dser.read_char();
-  switch (type) {
+Column *Column::deserialize(Deserializer &dser) {
+  switch (dser.read_char()) {
   case 'B':
     return BoolColumn::deserialize(dser);
   case 'I':

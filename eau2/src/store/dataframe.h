@@ -142,6 +142,24 @@ public:
     }
     return hash;
   }
+
+  /** Serializes a schema onto an object. Does not serialize row/col names. **/
+  void serialize(Serializer &ser) {
+    ser.write(width());
+    for (size_t i = 0; i < width(); i++) {
+      ser.write(col_type(i));
+    }
+  }
+
+  /** Deserializes a schema from a deserializer. **/
+  static Schema *deserialize(Deserializer &dser) {
+    Schema *schema = new Schema();
+    size_t width = dser.read_size_t();
+    for (size_t i = 0; i < width; i++) {
+      schema->add_column(dser.read_char(), nullptr);
+    }
+    return schema;
+  }
 };
 
 /*****************************************************************************
@@ -202,6 +220,7 @@ public:
         cols_.push_back(new StringColumn());
         break;
       }
+      cols_.get(i)->push_back_missing();
     }
   }
 
@@ -215,31 +234,15 @@ public:
 
   /** Setters: set the given column with the given value. Setting a column
    * with a value of the wrong type is undefined. */
-  void set(size_t col, int val) {
-    if (cols_.get(col)->size() == 0) {
-      cols_.get(col)->as_int()->push_back(0);
-    }
-    cols_.get(col)->as_int()->set(0, val);
-  }
-  void set(size_t col, float val) {
-    if (cols_.get(col)->size() == 0) {
-      cols_.get(col)->as_float()->push_back(0.0f);
-    }
-    cols_.get(col)->as_float()->set(0, val);
-  }
-  void set(size_t col, bool val) {
-    if (cols_.get(col)->size() == 0) {
-      cols_.get(col)->as_bool()->push_back(false);
-    }
-    cols_.get(col)->as_bool()->set(0, val);
-  }
+  void set(size_t col, int val) { cols_.get(col)->as_int()->set(0, val); }
+  void set(size_t col, float val) { cols_.get(col)->as_float()->set(0, val); }
+  void set(size_t col, bool val) { cols_.get(col)->as_bool()->set(0, val); }
   /** Acquire ownership of the string. */
   void set(size_t col, String *val) {
-    if (cols_.get(col)->size() == 0) {
-      cols_.get(col)->push_back(nullptr);
-    }
     cols_.get(col)->as_string()->set(0, val);
   }
+  /** Sets the given column to missing **/
+  void set_missing(size_t col) { cols_.get(col)->set_missing(0); }
 
   /** Set/get the index of this row (ie. its position in the dataframe.
    * This is only used for informational purposes, unused otherwise */
@@ -478,6 +481,11 @@ public:
     cols_.get(col)->as_string()->set(row, val);
   }
 
+  /** Determines if the given value is missing. **/
+  bool is_missing(size_t col, size_t row) {
+    return cols_.get(col)->is_missing(row);
+  }
+
   /** Set the fields of the given row object with values from the columns
    * at the given offset.  If the row is not form the same schema as the
    * dataframe, results are undefined.
@@ -485,7 +493,11 @@ public:
   void fill_row(size_t idx, Row &row) {
     row.set_idx(idx);
     for (size_t i = 0; i < ncols(); i++) {
-      String *s;
+      if (is_missing(i, idx)) {
+        row.set_missing(i);
+        continue;
+      }
+
       switch (scm_->col_type(i)) {
       case 'B':
         row.set(i, get_bool(i, idx));
@@ -497,8 +509,7 @@ public:
         row.set(i, get_float(i, idx));
         break;
       case 'S':
-        s = get_string(i, idx);
-        row.set(i, (s == nullptr) ? s : s->clone());
+        row.set(i, get_string(i, idx)->clone());
         break;
       default:
         assert(false);
@@ -614,6 +625,30 @@ public:
       rowers[i - 1]->join_delete(rowers[i]);
     }
     delete[] rowers;
+  }
+
+  /** Equality for Dataframes is based on values and not names. **/
+  bool equals(Object *o) {
+    DataFrame *that = dynamic_cast<DataFrame *>(o);
+    if (that == nullptr || that->nrows() != nrows() || that->ncols() != ncols())
+      return false;
+    for (size_t i = 0; i < ncols(); i++)
+      if (!cols_.get(i)->equals(that->cols_.get(i)))
+        return false;
+    return true;
+  }
+
+  /** Hash function for dataframe. **/
+  size_t hash() { return nrows() ^ ncols(); }
+
+  /** Clones this dataframe. **/
+  DataFrame *clone() {
+    Schema s;
+    DataFrame *df = new DataFrame(s);
+    for (size_t i = 0; i < ncols(); i++) {
+      df->add_column(cols_.get(i), nullptr);
+    }
+    return df;
   }
 };
 

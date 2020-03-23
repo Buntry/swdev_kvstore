@@ -293,3 +293,49 @@ TEST_F(DataFrameTest, GetLastElement) {
   String fb("Foobar");
   ASSERT(fb.equals(df.get_string(0, 9)));
 }
+
+TEST_F(DataFrameTest, TestClone) {
+  Schema s("IS");
+  DataFrame df(s);
+
+  String *q = new String("Foobar");
+
+  Row r(s);
+  for (size_t i = 0; i < 10; i++) {
+    r.set(0, (int)i);
+    r.set(1, q->clone());
+    df.add_row(r);
+  }
+
+  DataFrame *df2 = df.clone();
+  for (size_t i = 0; i < 10; i++) {
+    df2->fill_row(i, r);
+    ASSERT_EQ(r.get_int(0), (int)i);
+    ASSERT(r.get_string(1)->equals(q));
+  }
+
+  delete q;
+  delete df2;
+}
+
+TEST_F(DataFrameTest, TestEquality) {
+  Schema s("IS");
+  DataFrame df(s);
+
+  Row r(s);
+  for (size_t i = 0; i < 10; i++) {
+    r.set(0, (int)i);
+    r.set(1, new String("Foobar"));
+    df.add_row(r);
+  }
+
+  DataFrame *df2 = df.clone();
+
+  ASSERT(df.equals(df2));
+
+  DataFrame *df3 = new DataFrame(s);
+  ASSERT(!df.equals(df3));
+
+  delete df2;
+  delete df3;
+}

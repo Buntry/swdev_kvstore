@@ -145,3 +145,101 @@ TEST_F(SerializerTest, FailOnBadCursor) {
   Deserializer dser(new CharArray());
   ASSERT_FAIL(dser.read_char());
 }
+
+TEST_F(SerializerTest, TestBoolColumn) {
+  BoolColumn bc;
+  bc.push_back(true);
+  bc.push_back(false);
+  bc.push_back_missing();
+  bc.push_back_missing();
+
+  ser.write(&bc);
+  Deserializer dser(*ser.data());
+
+  BoolColumn *bc2 = Column::deserialize(dser)->as_bool();
+  for (size_t i = 0; i < bc.size(); i++) {
+    ASSERT_EQ(bc.is_missing(i), bc2->is_missing(i));
+    if (!bc.is_missing(i)) {
+      ASSERT_EQ(bc.get(i), bc2->get(i));
+    }
+  }
+  delete bc2;
+}
+
+TEST_F(SerializerTest, TestIntColumn) {
+  IntColumn ic;
+  ic.push_back(-25);
+  ic.push_back_missing();
+  ic.push_back(200);
+  ic.push_back_missing();
+
+  ser.write(&ic);
+  Deserializer dser(*ser.data());
+
+  IntColumn *ic2 = Column::deserialize(dser)->as_int();
+  for (size_t i = 0; i < ic.size(); i++) {
+    ASSERT_EQ(ic.is_missing(i), ic2->is_missing(i));
+    if (!ic.is_missing(i)) {
+      ASSERT_EQ(ic.get(i), ic2->get(i));
+    }
+  }
+  delete ic2;
+}
+
+TEST_F(SerializerTest, TestFloatColumn) {
+  FloatColumn fc;
+  fc.push_back(-25.003f);
+  fc.push_back_missing();
+  fc.push_back(200.999f);
+  fc.push_back_missing();
+
+  ser.write(&fc);
+  Deserializer dser(*ser.data());
+
+  FloatColumn *fc2 = Column::deserialize(dser)->as_float();
+  for (size_t i = 0; i < fc.size(); i++) {
+    ASSERT_EQ(fc.is_missing(i), fc2->is_missing(i));
+    if (!fc.is_missing(i)) {
+      ASSERT_FLOAT_EQ(fc.get(i), fc2->get(i));
+    }
+  }
+  delete fc2;
+}
+
+TEST_F(SerializerTest, TestStringColumn) {
+  String *a = new String("Alice");
+  String *b = new String("Bob");
+  String *c = new String("Charlie");
+
+  StringColumn *sc = new StringColumn(3, a, b, nullptr, c);
+
+  ser.write(sc);
+
+  Deserializer dser(*ser.data());
+  Column *qc = Column::deserialize(dser);
+
+  assert(sc->size() == qc->size());
+  for (size_t i = 0; i < sc->size(); i++) {
+    assert(Util::equals(sc->get(i), qc->as_string()->get(i)));
+  }
+
+  delete a;
+  delete b;
+  delete c;
+
+  delete sc;
+  delete qc;
+}
+
+TEST_F(SerializerTest, TestSchema) {
+  Schema s("BFISIFS");
+  ser.write(&s);
+
+  Deserializer dser(*ser.data());
+  Schema *q = Schema::deserialize(dser);
+
+  ASSERT(s.equals(q));
+  delete q;
+}
+
+TEST_F(SerializerTest, TestDataFrame) {}
