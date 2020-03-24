@@ -162,6 +162,7 @@ generate_classarray(IntArray, int);
 generate_classarray(FloatArray, float);
 generate_classarray(DoubleArray, double);
 generate_classarray(CharArray, char);
+generate_classarray(SizeTArray, size_t);
 
 #define generate_object_classarray(KlassArray, Klass)                          \
   class KlassArray : public Array {                                            \
