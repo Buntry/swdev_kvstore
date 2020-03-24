@@ -26,6 +26,7 @@ public:
     return !((a - b > DOUBLE_TOLERANCE) || (b - a > DOUBLE_TOLERANCE));
   }
   static bool equals(bool a, bool b) { return a == b; }
+  static bool equals(size_t a, size_t b) { return a == b; }
 
   /** Hash functions **/
   static size_t hash(Object *a) { return (a == nullptr) ? 0 : a->hash(); }
@@ -33,6 +34,7 @@ public:
   static size_t hash(float a) { return std::hash<float>{}(a); }   // lang: Cpp
   static size_t hash(double a) { return std::hash<double>{}(a); } // lang: Cpp
   static size_t hash(bool a) { return a; }
+  static size_t hash(size_t a) { return a; }
 
   /** Clone functions **/
   static Object *clone(Object *a) { return (a == nullptr) ? a : a->clone(); }
@@ -40,6 +42,7 @@ public:
   static float clone(float a) { return a; }
   static double clone(double a) { return a; }
   static bool clone(bool a) { return a; }
+  static size_t clone(size_t a) { return a; }
 
   /** Delete functions **/
   static void destroy(Object *a) { delete a; }
@@ -47,4 +50,5 @@ public:
   static void destroy(float a) {}
   static void destroy(double a) {}
   static void destory(bool a) {}
+  static void destroy(size_t a) {}
 };
