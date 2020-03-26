@@ -73,6 +73,12 @@ public:
       push_back(unpacki(bytes));
     }
   }
+
+  void serialize(Serializer &ser) {
+    for (size_t i = 0; i < size(); i++) {
+      ser.write(get(i));
+    }
+  }
 };
 
 /** Represents a DoubleArray that is serializable.
@@ -93,6 +99,12 @@ public:
     size_t len = unpackst(bytes);
     for (size_t i = 0; i < len; i++) {
       push_back(unpackd(bytes));
+    }
+  }
+
+  void serialize(Serializer &ser) {
+    for (size_t i = 0; i < size(); i++) {
+      ser.write(get(i));
     }
   }
 };
