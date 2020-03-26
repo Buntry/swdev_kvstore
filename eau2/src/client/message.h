@@ -196,7 +196,10 @@ public:
 
   void serialize(Serializer &ser) {
     Message::serialize(ser);
-    // TODO: client
+    ser.write(client.sin_family);
+    ser.write(client.sin_port);
+    // TODO: fix this: ser.write(client.sin_addr.s_addr);
+    ser.write(client.sin_zero);
     ser.write(port);
   }
 
@@ -205,7 +208,10 @@ public:
     r->sender_ = dser.read_size_t();
     r->target_ = dser.read_size_t();
     r->id_ = dser.read_size_t();
-    // TODO: client
+    r->client.sin_family = dser.read_int();
+    r->client.sin_port = dser.read_int();
+    r->client.sin_addr.s_addr = dser.read_float();
+    // ??? r->client.sin_zero = dser.read_char();
     r->port = dser.read_size_t();
 
     return r;
