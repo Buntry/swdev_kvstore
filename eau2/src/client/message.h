@@ -51,6 +51,23 @@ public:
       push_back(unpacks(bytes));
     }
   }
+
+  void serialize(Serializer &ser) {
+    for (size_t i = 0; i < size(); i++) {
+      get(i)->serialize(ser);
+    }
+  }
+
+  SerializableStringArray *deserialize(Deserializer &dser) {
+    SerializableStringArray *sa = new SerializableStringArray();
+    size_t len = dser.read_size_t();
+
+    for (size_t i = 0; i < len; i++) {
+      push_back(String::deserialize(dser));
+    }
+
+    return sa;
+  }
 };
 
 /** Represents a IntArray that is serializable.
@@ -79,6 +96,17 @@ public:
       ser.write(get(i));
     }
   }
+
+  SerializableIntArray *deserialize(Deserializer &dser) {
+    SerializableIntArray *sa = new SerializableIntArray();
+    size_t len = dser.read_size_t();
+
+    for (size_t i = 0; i < len; i++) {
+      push_back(dser.read_int());
+    }
+
+    return sa;
+  }
 };
 
 /** Represents a DoubleArray that is serializable.
@@ -106,6 +134,17 @@ public:
     for (size_t i = 0; i < size(); i++) {
       ser.write(get(i));
     }
+  }
+
+  SerializableDoubleArray *deserialize(Deserializer &dser) {
+    SerializableDoubleArray *sa = new SerializableDoubleArray();
+    size_t len = dser.read_size_t();
+
+    for (size_t i = 0; i < len; i++) {
+      push_back(dser.read_double());
+    }
+
+    return sa;
   }
 };
 
@@ -211,7 +250,7 @@ public:
     r->client.sin_family = dser.read_int();
     r->client.sin_port = dser.read_int();
     r->client.sin_addr.s_addr = dser.read_float();
-    // ??? r->client.sin_zero = dser.read_char();
+    // TODO: Fix this?? r->client.sin_zero = dser.read_char();
     r->port = dser.read_size_t();
 
     return r;
@@ -266,7 +305,8 @@ public:
   void serialize(Serializer &ser) {
     Message::serialize(ser);
     ser.write(clients);
-    //TODO: ports, addresses
+    addresses.serialize(ser);
+    ports.serialize(ser);
   }
 
   Directory *deserialize(Deserializer &dser) {
@@ -275,7 +315,8 @@ public:
     d->target_ = dser.read_size_t();
     d->id_ = dser.read_size_t();
     d->clients = dser.read_size_t();
-    //TODO: ports, addresses
+    d->addresses.deserialize(dser);
+    d->ports.deserialize(dser);
 
     return d;
   }
@@ -344,7 +385,7 @@ public:
     p->sender_ = dser.read_size_t();
     p->target_ = dser.read_size_t();
     p->id_ = dser.read_size_t();
-    // TODO: msg_
+    p->msg_ = String::deserialize(dser);
 
     return p;
   }
@@ -397,7 +438,7 @@ public:
     r->sender_ = dser.read_size_t();
     r->target_ = dser.read_size_t();
     r->id_ = dser.read_size_t();
-    // TODO: msg_
+    r->msg_ = String::deserialize(dser);
 
     return r;
   }
@@ -502,7 +543,7 @@ public:
     s->sender_ = dser.read_size_t();
     s->target_ = dser.read_size_t();
     s->id_ = dser.read_size_t();
-    // TODO: msg_
+    s->msg_ = String::deserialize(dser);
 
     return s;
   }
