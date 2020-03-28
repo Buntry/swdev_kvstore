@@ -59,4 +59,5 @@ public:
   size_t incr_cursor_();
   char next_char_();
   void fill_up_(char *bytes, size_t len);
+  CharArray *data() { return data_; }
 };

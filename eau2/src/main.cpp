@@ -25,8 +25,9 @@ Network *get_network() {
 
 int main(int argc, char **argv) {
   arg.parse(argc, argv);
-  assert(arg.num_nodes != 0);
+  assert(arg.num_nodes != 0); // Ensure there is at least one node
 
   Network *network = get_network();
+
   delete network;
 }
