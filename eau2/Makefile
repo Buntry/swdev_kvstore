@@ -25,3 +25,7 @@ valgr: build
 # Cleans only the compiled binaries and datafiles
 clean:
 	rm -rf a.out*
+
+# Examples of running our application
+pseudo: build
+	./a.out -pseudo -num_nodes 3

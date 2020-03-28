@@ -75,7 +75,6 @@ public:
 
     // Send the directory message to all clients
     for (size_t i = 1; i < num_nodes_; i++) {
-      NodeInfo *node = node_information_.get(i);
       dir.init(index_, i, msg_id++);
       send_msg_(dir);
     }
