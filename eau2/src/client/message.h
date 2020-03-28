@@ -3,8 +3,7 @@
 
 #include <arpa/inet.h>
 
-#include "../utils/array.h"
-#include "../utils/pack.h"
+#include "../store/dataframe.h"
 
 /** Represents the types of messages a node can send over the network. **/
 enum class MsgKind {
@@ -20,134 +19,6 @@ enum class MsgKind {
   Directory
 };
 
-/** Represents a String Array that is serializable.
- * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
-class SerializableStringArray : public StringArray {
-public:
-  void encode(char *&bytes) {
-    packst(bytes, size());
-    for (size_t i = 0; i < size(); i++) {
-      packs(bytes, get(i));
-    }
-  }
-
-  size_t num_bytes() {
-    size_t byte_count = sizeof(size_t);
-    for (size_t i = 0; i < size(); i++) {
-      String *s = get(i);
-      if (s == nullptr) {
-        byte_count++;
-      } else {
-        byte_count += sizeof(size_t) + s->size() + 1;
-      }
-    }
-    return byte_count;
-  }
-
-  void decode(char *&bytes) {
-    clear();
-    size_t len = unpackst(bytes);
-    for (size_t i = 0; i < len; i++) {
-      push_back(unpacks(bytes));
-    }
-  }
-
-  void serialize(Serializer &ser) {
-    for (size_t i = 0; i < size(); i++) {
-      get(i)->serialize(ser);
-    }
-  }
-
-  SerializableStringArray *deserialize(Deserializer &dser) {
-    SerializableStringArray *sa = new SerializableStringArray();
-    size_t len = dser.read_size_t();
-
-    for (size_t i = 0; i < len; i++) {
-      push_back(String::deserialize(dser));
-    }
-
-    return sa;
-  }
-};
-
-/** Represents a IntArray that is serializable.
- * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
-class SerializableIntArray : public IntArray {
-public:
-  void encode(char *&bytes) {
-    packst(bytes, size());
-    for (size_t i = 0; i < size(); i++) {
-      packi(bytes, get(i));
-    }
-  }
-
-  size_t num_bytes() { return sizeof(size_t) + (sizeof(int) * size()); }
-
-  void decode(char *&bytes) {
-    clear(); // Clear the array and push back all the doubles from bytes.
-    size_t len = unpackst(bytes);
-    for (size_t i = 0; i < len; i++) {
-      push_back(unpacki(bytes));
-    }
-  }
-
-  void serialize(Serializer &ser) {
-    for (size_t i = 0; i < size(); i++) {
-      ser.write(get(i));
-    }
-  }
-
-  SerializableIntArray *deserialize(Deserializer &dser) {
-    SerializableIntArray *sa = new SerializableIntArray();
-    size_t len = dser.read_size_t();
-
-    for (size_t i = 0; i < len; i++) {
-      push_back(dser.read_int());
-    }
-
-    return sa;
-  }
-};
-
-/** Represents a DoubleArray that is serializable.
- * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
-class SerializableDoubleArray : public DoubleArray {
-public:
-  void encode(char *&bytes) {
-    packst(bytes, size());
-    for (size_t i = 0; i < size(); i++) {
-      packd(bytes, get(i));
-    }
-  }
-
-  size_t num_bytes() { return sizeof(size_t) + (sizeof(double) * size()); }
-
-  void decode(char *&bytes) {
-    clear(); // Clear the array and push back all the doubles from bytes.
-    size_t len = unpackst(bytes);
-    for (size_t i = 0; i < len; i++) {
-      push_back(unpackd(bytes));
-    }
-  }
-
-  void serialize(Serializer &ser) {
-    for (size_t i = 0; i < size(); i++) {
-      ser.write(get(i));
-    }
-  }
-
-  SerializableDoubleArray *deserialize(Deserializer &dser) {
-    SerializableDoubleArray *sa = new SerializableDoubleArray();
-    size_t len = dser.read_size_t();
-
-    for (size_t i = 0; i < len; i++) {
-      push_back(dser.read_double());
-    }
-
-    return sa;
-  }
-};
-
 /** Represents a message.
  *  @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
 class Message : public Object {
@@ -157,103 +28,68 @@ public:
   size_t target_;
   size_t id_;
 
+  /** Easy way to initialize the sender, target, and id of a msg. **/
   void init(size_t sender, size_t target, size_t id) {
     sender_ = sender;
     target_ = target;
     id_ = id;
   }
 
-  virtual void encode(char *&bytes) {
-    packst(bytes, static_cast<size_t>(kind_));
-    packst(bytes, sender_);
-    packst(bytes, target_);
-    packst(bytes, id_);
-  }
-
-  virtual void decode(char *&bytes) {
-    kind_ = static_cast<MsgKind>(unpackst(bytes));
-    sender_ = unpackst(bytes);
-    target_ = unpackst(bytes);
-    id_ = unpackst(bytes);
-  }
-
-  virtual size_t num_bytes() { return sizeof(size_t) * 4; }
+  MsgKind kind() { return kind_; }
+  size_t sender() { return sender_; }
+  size_t target() { return target_; }
 
   virtual void serialize(Serializer &ser) {
+    ser.write(static_cast<size_t>(kind_));
     ser.write(sender_);
     ser.write(target_);
     ser.write(id_);
   }
 
   virtual Message *deserialize(Deserializer &dser) {
-    Message *m = new Message();
-    m->sender_ = dser.read_size_t();
-    m->target_ = dser.read_size_t();
-    m->id_ = dser.read_size_t();
-
-    return m;
+    kind_ = static_cast<MsgKind>(dser.read_size_t());
+    sender_ = dser.read_size_t();
+    target_ = dser.read_size_t();
+    id_ = dser.read_size_t();
+    return this;
   }
+
+  static Message *from(Deserializer &dser);
 };
 
 /** Represents all the information needed to register.
  * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
 class Register : public Message {
 public:
-  sockaddr_in client;
-  size_t port;
+  sockaddr_in address_;
+  size_t port_;
 
-  Register() {
-    kind_ = MsgKind::Register;
-    port = 0;
-  }
+  Register() { kind_ = MsgKind::Register; }
 
-  void set(sockaddr_in c, size_t p) {
-    client = c;
-    port = p;
-  }
-
-  void encode(char *&bytes) {
-    Message::encode(bytes);
-    packst(bytes, port);
-    memcpy(bytes, &client.sin_addr, sizeof(client.sin_addr));
-    advance(bytes, sizeof(client.sin_addr));
-  }
-
-  size_t num_bytes() {
-    return Message::num_bytes() + sizeof(size_t) + sizeof(client.sin_addr);
-  }
-
-  void decode(char *&bytes) {
-    Message::decode(bytes);
-    port = unpackst(bytes);
-
-    client.sin_family = AF_INET;
-    memcpy(&client.sin_addr, bytes, sizeof(client.sin_addr));
-    advance(bytes, sizeof(client.sin_addr));
-    client.sin_port = htons(port);
+  void set(sockaddr_in address, size_t port) {
+    address_ = address;
+    port_ = port;
   }
 
   void serialize(Serializer &ser) {
     Message::serialize(ser);
-    ser.write(client.sin_family);
-    ser.write(client.sin_port);
-    // TODO: fix this: ser.write(client.sin_addr.s_addr);
-    ser.write(client.sin_zero);
-    ser.write(port);
+    ser.write(port_);
+    String *ip = new String(inet_ntoa(address_.sin_addr));
+    ser.write(ip);
+    delete ip;
   }
 
   Register *deserialize(Deserializer &dser) {
-    Register *r = new Register();
-    r->sender_ = dser.read_size_t();
-    r->target_ = dser.read_size_t();
-    r->id_ = dser.read_size_t();
-    r->client.sin_family = dser.read_int();
-    r->client.sin_port = dser.read_int();
-    r->client.sin_addr.s_addr = dser.read_float();
-    // TODO: Fix this?? r->client.sin_zero = dser.read_char();
-    r->port = dser.read_size_t();
+    Message::deserialize(dser);
+    port_ = dser.read_size_t();
+    String *ip = String::deserialize(dser);
 
-    return r;
+    address_.sin_family = AF_INET;
+    inet_pton(AF_INET, ip->c_str(), &address_.sin_addr);
+    address_.sin_port = htons(port_);
+
+    delete ip;
+    return this;
   }
 };
 
@@ -262,297 +98,302 @@ public:
  * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
 class Directory : public Message {
 public:
-  SerializableStringArray addresses;
-  SerializableIntArray ports;
-  size_t clients;
+  StringColumn *addresses_;
+  IntColumn *ports_;
+  size_t clients_;
 
   Directory() {
     kind_ = MsgKind::Directory;
-    clients = 0;
+    addresses_ = new StringColumn();
+    ports_ = new IntColumn();
+    clients_ = 0;
   }
 
   ~Directory() {
-    for (size_t i = 0; i < clients; i++) {
-      delete addresses.get(i);
-    }
+    delete addresses_;
+    delete ports_;
   }
 
-  void add(String *address, int port) {
-    addresses.push_back(address);
-    ports.push_back(port);
-    clients++;
-  }
+  size_t clients() { return clients_; }
+  String *address(size_t idx) { return addresses_->get(idx); }
+  size_t port(size_t idx) { return ports_->get(idx); }
 
-  void encode(char *&bytes) {
-    Message::encode(bytes);
-    packst(bytes, clients);
-    addresses.encode(bytes);
-    ports.encode(bytes);
-  }
-
-  size_t num_bytes() {
-    return Message::num_bytes() + sizeof(size_t) + addresses.num_bytes() +
-           ports.num_bytes();
-  }
-
-  void decode(char *&bytes) {
-    Message::decode(bytes);
-    clients = unpackst(bytes);
-    addresses.decode(bytes);
-    ports.decode(bytes);
+  /** Adds a client to the directory **/
+  void add_client(String &address, int port) {
+    addresses_->push_back(&address);
+    ports_->push_back(port);
+    clients_++;
   }
 
   void serialize(Serializer &ser) {
     Message::serialize(ser);
-    ser.write(clients);
-    addresses.serialize(ser);
-    ports.serialize(ser);
+    ser.write(clients_);
+    ser.write(addresses_);
+    ser.write(ports_);
   }
 
   Directory *deserialize(Deserializer &dser) {
-    Directory *d = new Directory();
-    d->sender_ = dser.read_size_t();
-    d->target_ = dser.read_size_t();
-    d->id_ = dser.read_size_t();
-    d->clients = dser.read_size_t();
-    d->addresses.deserialize(dser);
-    d->ports.deserialize(dser);
+    Message::deserialize(dser);
 
-    return d;
+    delete addresses_;
+    delete ports_;
+
+    clients_ = dser.read_size_t();
+    addresses_ = Column::deserialize(dser)->as_string();
+    ports_ = Column::deserialize(dser)->as_int();
+    return this;
   }
 };
 
-/** Represents an Ack: an acknowledgement Message
- * that a message was properly received.
- * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
-class Ack : public Message {
-public:
-  Ack() { kind_ = MsgKind::Ack; }
-};
-
-/** Represents an Nack: a message that indicates
- * that an expected message was never received.
- * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
-class Nack : public Message {
-public:
-  Nack() { kind_ = MsgKind::Nack; }
-};
-
-/** Represents a Put: a message to be sent
- * to another client.
- * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
-class Put : public Message {
-public:
-  String *msg_;
-
-  Put() {
-    kind_ = MsgKind::Put;
-    msg_ = nullptr;
+Message *Message::from(Deserializer &dser) {
+  MsgKind kind = static_cast<MsgKind>(dser.peek_size_t());
+  Message *msg;
+  switch (kind) {
+  case MsgKind::Register:
+    msg = new Register();
+    break;
+  case MsgKind::Directory:
+    msg = new Directory();
+    break;
+  default:
+    msg = nullptr;
+    break;
   }
+  msg->deserialize(dser);
+  return msg;
+}
 
-  ~Put() { delete msg_; }
+// /** Represents an Ack: an acknowledgement Message
+//  * that a message was properly received.
+//  * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
+// class Ack : public Message {
+// public:
+//   Ack() { kind_ = MsgKind::Ack; }
+// };
 
-  void set(String *msg) { msg_ = msg; }
+// /** Represents an Nack: a message that indicates
+//  * that an expected message was never received.
+//  * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
+// class Nack : public Message {
+// public:
+//   Nack() { kind_ = MsgKind::Nack; }
+// };
 
-  void encode(char *&bytes) {
-    Message::encode(bytes);
-    packs(bytes, msg_);
-  }
+// /** Represents a Put: a message to be sent
+//  * to another client.
+//  * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
+// class Put : public Message {
+// public:
+//   String *msg_;
 
-  size_t num_bytes() {
-    size_t num = Message::num_bytes();
-    if (msg_ == nullptr) {
-      num++;
-    } else {
-      num += sizeof(size_t) + msg_->size() + 1;
-    }
+//   Put() {
+//     kind_ = MsgKind::Put;
+//     msg_ = nullptr;
+//   }
 
-    return num;
-  }
+//   ~Put() { delete msg_; }
 
-  void decode(char *&bytes) {
-    Message::decode(bytes);
-    msg_ = unpacks(bytes);
-  }
+//   void set(String *msg) { msg_ = msg; }
 
-  void serialize(Serializer &ser) {
-    Message::serialize(ser);
-    ser.write(msg_->c_str(), msg_->size());
-  }
+//   void encode(char *&bytes) {
+//     Message::encode(bytes);
+//     packs(bytes, msg_);
+//   }
 
-  virtual Put *deserialize(Deserializer &dser) {
-    Put *p = new Put();
-    p->sender_ = dser.read_size_t();
-    p->target_ = dser.read_size_t();
-    p->id_ = dser.read_size_t();
-    p->msg_ = String::deserialize(dser);
+//   size_t num_bytes() {
+//     size_t num = Message::num_bytes();
+//     if (msg_ == nullptr) {
+//       num++;
+//     } else {
+//       num += sizeof(size_t) + msg_->size() + 1;
+//     }
 
-    return p;
-  }
-};
+//     return num;
+//   }
 
-/** Represents a Reply: a message that is sent
- * in response to a message received from a client.
- * @author: griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
-class Reply : public Message {
-public:
-  String *msg_;
+//   void decode(char *&bytes) {
+//     Message::decode(bytes);
+//     msg_ = unpacks(bytes);
+//   }
 
-  Reply() {
-    kind_ = MsgKind::Reply;
-    msg_ = nullptr;
-  }
+//   void serialize(Serializer &ser) {
+//     Message::serialize(ser);
+//     ser.write(msg_->c_str(), msg_->size());
+//   }
 
-  ~Reply() { delete msg_; }
+//   virtual Put *deserialize(Deserializer &dser) {
+//     Put *p = new Put();
+//     p->sender_ = dser.read_size_t();
+//     p->target_ = dser.read_size_t();
+//     p->id_ = dser.read_size_t();
+//     p->msg_ = String::deserialize(dser);
 
-  void set(String *msg) { msg_ = msg; }
+//     return p;
+//   }
+// };
 
-  void encode(char *&bytes) {
-    Message::encode(bytes);
-    packs(bytes, msg_);
-  }
+// /** Represents a Reply: a message that is sent
+//  * in response to a message received from a client.
+//  * @author: griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
+// class Reply : public Message {
+// public:
+//   String *msg_;
 
-  size_t num_bytes() {
-    size_t num = Message::num_bytes();
-    if (msg_ == nullptr) {
-      num++;
-    } else {
-      num += sizeof(size_t) + msg_->size() + 1;
-    }
+//   Reply() {
+//     kind_ = MsgKind::Reply;
+//     msg_ = nullptr;
+//   }
 
-    return num;
-  }
+//   ~Reply() { delete msg_; }
 
-  void decode(char *&bytes) {
-    Message::decode(bytes);
-    msg_ = unpacks(bytes);
-  }
+//   void set(String *msg) { msg_ = msg; }
 
-  void serialize(Serializer &ser) {
-    Message::serialize(ser);
-    ser.write(msg_->c_str(), msg_->size());
-  }
+//   void encode(char *&bytes) {
+//     Message::encode(bytes);
+//     packs(bytes, msg_);
+//   }
 
-  virtual Reply *deserialize(Deserializer &dser) {
-    Reply *r = new Reply();
-    r->sender_ = dser.read_size_t();
-    r->target_ = dser.read_size_t();
-    r->id_ = dser.read_size_t();
-    r->msg_ = String::deserialize(dser);
+//   size_t num_bytes() {
+//     size_t num = Message::num_bytes();
+//     if (msg_ == nullptr) {
+//       num++;
+//     } else {
+//       num += sizeof(size_t) + msg_->size() + 1;
+//     }
 
-    return r;
-  }
-};
+//     return num;
+//   }
 
-/** Represents a Get: a message that is sent
- * and indicates a request to receive a message from a
- * specific client
- * @author: griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
-class Get : public Message {
-public:
-  Get() { kind_ = MsgKind::Get; }
-};
+//   void decode(char *&bytes) {
+//     Message::decode(bytes);
+//     msg_ = unpacks(bytes);
+//   }
 
-/** Represents a WaitAndGet: a message that is sent
- * that indicates it wishes to receive a message from a
- * client after a specified wait period (in ms)..
- * @author: griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
-class WaitAndGet : public Message {
-public:
-  size_t wait_ms_;
+//   void serialize(Serializer &ser) {
+//     Message::serialize(ser);
+//     ser.write(msg_->c_str(), msg_->size());
+//   }
 
-  WaitAndGet() {
-    kind_ = MsgKind::WaitAndGet;
-    wait_ms_ = 0;
-  }
+//   virtual Reply *deserialize(Deserializer &dser) {
+//     Reply *r = new Reply();
+//     r->sender_ = dser.read_size_t();
+//     r->target_ = dser.read_size_t();
+//     r->id_ = dser.read_size_t();
+//     r->msg_ = String::deserialize(dser);
 
-  void set(size_t wait_ms) { wait_ms_ = wait_ms; }
+//     return r;
+//   }
+// };
 
-  void encode(char *&bytes) {
-    Message::encode(bytes);
-    packst(bytes, wait_ms_);
-  }
+// /** Represents a Get: a message that is sent
+//  * and indicates a request to receive a message from a
+//  * specific client
+//  * @author: griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
+// class Get : public Message {
+// public:
+//   Get() { kind_ = MsgKind::Get; }
+// };
 
-  size_t num_bytes() { return Message::num_bytes() + sizeof(size_t); }
+// /** Represents a WaitAndGet: a message that is sent
+//  * that indicates it wishes to receive a message from a
+//  * client after a specified wait period (in ms)..
+//  * @author: griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
+// class WaitAndGet : public Message {
+// public:
+//   size_t wait_ms_;
 
-  void decode(char *&bytes) {
-    Message::decode(bytes);
-    wait_ms_ = unpackst(bytes);
-  }
+//   WaitAndGet() {
+//     kind_ = MsgKind::WaitAndGet;
+//     wait_ms_ = 0;
+//   }
 
-  void serialize(Serializer &ser) {
-    Message::serialize(ser);
-    ser.write(wait_ms_);
-  }
+//   void set(size_t wait_ms) { wait_ms_ = wait_ms; }
 
-  virtual WaitAndGet *deserialize(Deserializer &dser) {
-    WaitAndGet *w = new WaitAndGet();
-    w->sender_ = dser.read_size_t();
-    w->target_ = dser.read_size_t();
-    w->id_ = dser.read_size_t();
-    w->wait_ms_ = dser.read_size_t();
+//   void encode(char *&bytes) {
+//     Message::encode(bytes);
+//     packst(bytes, wait_ms_);
+//   }
 
-    return w;
-  }
-};
+//   size_t num_bytes() { return Message::num_bytes() + sizeof(size_t); }
 
-/** Represents a Status: a message that a client
- * emits to the Server.
- * @author: griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
-class Status : public Message {
-public:
-  String *msg_; // Owned
+//   void decode(char *&bytes) {
+//     Message::decode(bytes);
+//     wait_ms_ = unpackst(bytes);
+//   }
 
-  Status() {
-    kind_ = MsgKind::Status;
-    msg_ = nullptr;
-  }
+//   void serialize(Serializer &ser) {
+//     Message::serialize(ser);
+//     ser.write(wait_ms_);
+//   }
 
-  ~Status() { delete msg_; }
+//   virtual WaitAndGet *deserialize(Deserializer &dser) {
+//     WaitAndGet *w = new WaitAndGet();
+//     w->sender_ = dser.read_size_t();
+//     w->target_ = dser.read_size_t();
+//     w->id_ = dser.read_size_t();
+//     w->wait_ms_ = dser.read_size_t();
 
-  void set(String *msg) { msg_ = msg; }
+//     return w;
+//   }
+// };
 
-  void encode(char *&bytes) {
-    Message::encode(bytes);
-    packs(bytes, msg_);
-  }
+// /** Represents a Status: a message that a client
+//  * emits to the Server.
+//  * @author: griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
+// class Status : public Message {
+// public:
+//   String *msg_; // Owned
 
-  size_t num_bytes() {
-    size_t num = Message::num_bytes();
-    if (msg_ == nullptr) {
-      num++;
-    } else {
-      num += sizeof(size_t) + msg_->size() + 1;
-    }
+//   Status() {
+//     kind_ = MsgKind::Status;
+//     msg_ = nullptr;
+//   }
 
-    return num;
-  }
+//   ~Status() { delete msg_; }
 
-  void decode(char *&bytes) {
-    Message::decode(bytes);
-    msg_ = unpacks(bytes);
-  }
+//   void set(String *msg) { msg_ = msg; }
 
-  void serialize(Serializer &ser) {
-    Message::serialize(ser);
-    ser.write(msg_->c_str(), msg_->size());
-  }
+//   void encode(char *&bytes) {
+//     Message::encode(bytes);
+//     packs(bytes, msg_);
+//   }
 
-  virtual Status *deserialize(Deserializer &dser) {
-    Status *s = new Status();
-    s->sender_ = dser.read_size_t();
-    s->target_ = dser.read_size_t();
-    s->id_ = dser.read_size_t();
-    s->msg_ = String::deserialize(dser);
+//   size_t num_bytes() {
+//     size_t num = Message::num_bytes();
+//     if (msg_ == nullptr) {
+//       num++;
+//     } else {
+//       num += sizeof(size_t) + msg_->size() + 1;
+//     }
 
-    return s;
-  }
-};
+//     return num;
+//   }
 
-/** Represents a Kill: a message that indicates
- * a request to stop the Node and exit.
- * @author: griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
-class Kill : public Message {
-public:
-  Kill() { kind_ = MsgKind::Kill; }
-};
+//   void decode(char *&bytes) {
+//     Message::decode(bytes);
+//     msg_ = unpacks(bytes);
+//   }
+
+//   void serialize(Serializer &ser) {
+//     Message::serialize(ser);
+//     ser.write(msg_->c_str(), msg_->size());
+//   }
+
+//   virtual Status *deserialize(Deserializer &dser) {
+//     Status *s = new Status();
+//     s->sender_ = dser.read_size_t();
+//     s->target_ = dser.read_size_t();
+//     s->id_ = dser.read_size_t();
+//     s->msg_ = String::deserialize(dser);
+
+//     return s;
+//   }
+// };
+
+// /** Represents a Kill: a message that indicates
+//  * a request to stop the Node and exit.
+//  * @author: griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
+// class Kill : public Message {
+// public:
+//   Kill() { kind_ = MsgKind::Kill; }
+// };

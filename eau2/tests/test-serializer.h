@@ -1,6 +1,7 @@
 // lang: CwC
 #pragma once
 
+#include "../src/client/message.h"
 #include "../src/utils/serializer.h"
 #include "test-macros.h"
 #include <gtest/gtest.h>
@@ -242,4 +243,106 @@ TEST_F(SerializerTest, TestSchema) {
   delete q;
 }
 
-TEST_F(SerializerTest, TestDataFrame) {}
+TEST_F(SerializerTest, Message) {
+  Message *m1 = new Message();
+  m1->init(1, 2, 3);
+
+  ser.write(m1);
+  Deserializer dser(*ser.data());
+
+  Message *m2 = new Message();
+  m2->deserialize(dser);
+
+  ASSERT_EQ(m1->sender(), m2->sender());
+  ASSERT_EQ(m1->target(), m2->target());
+  ASSERT_EQ(m2->id_, 3);
+}
+
+TEST_F(SerializerTest, Register) {
+  sockaddr_in addr;
+  size_t port = 8080;
+
+  // Initialize the port
+  addr.sin_family = AF_INET;
+  inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+  addr.sin_port = htons(port);
+
+  Register r1;
+  r1.init(1, 2, 3);
+  r1.set(addr, port);
+  ser.write(&r1);
+
+  Deserializer dser(*ser.data());
+  Register *r2 = new Register();
+  r2->deserialize(dser);
+
+  ASSERT_EQ(r1.sender(), r2->sender());
+  ASSERT_EQ(r1.port_, r2->port_);
+  ASSERT_EQ(r1.address_.sin_port, r2->address_.sin_port);
+
+  String *r1ip = new String(inet_ntoa(r1.address_.sin_addr));
+  String *r2ip = new String(inet_ntoa(r2->address_.sin_addr));
+
+  ASSERT(r1ip->equals(r2ip));
+  delete r1ip;
+  delete r2ip;
+  delete r2;
+}
+
+TEST_F(SerializerTest, Directory) {
+  Directory d1;
+  String ip1("127.0.0.1");
+  size_t port1 = 8080;
+  String ip2("127.0.0.2");
+  size_t port2 = 8081;
+  String ip3("127.0.0.3");
+  size_t port3 = 8082;
+
+  d1.add_client(ip1, port1);
+  d1.add_client(ip2, port2);
+  d1.add_client(ip3, port3);
+  ASSERT_EQ(d1.clients(), 3);
+  d1.init(1, 2, 3);
+
+  ser.write(&d1);
+  Deserializer dser(*ser.data());
+  Directory *d2 = new Directory();
+  d2->deserialize(dser);
+
+  ASSERT_EQ(d1.sender(), d2->sender());
+  ASSERT_EQ(d1.clients(), d2->clients());
+
+  for (size_t i = 0; i < d1.clients(); i++) {
+    ASSERT(d1.address(i)->equals(d2->address(i)));
+    ASSERT_EQ(d1.port(i), d2->port(i));
+  }
+  delete d2;
+}
+
+TEST_F(SerializerTest, MsgFrom) {
+  Directory d1;
+  String ip1("127.0.0.1");
+  size_t port1 = 8080;
+  String ip2("127.0.0.2");
+  size_t port2 = 8081;
+  String ip3("127.0.0.3");
+  size_t port3 = 8082;
+
+  d1.add_client(ip1, port1);
+  d1.add_client(ip2, port2);
+  d1.add_client(ip3, port3);
+  ASSERT_EQ(d1.clients(), 3);
+  d1.init(1, 2, 3);
+
+  ser.write(&d1);
+  Deserializer dser(*ser.data());
+  Directory *d2 = dynamic_cast<Directory *>(Message::from(dser));
+  ASSERT_EQ(d1.sender(), d2->sender());
+  ASSERT_EQ(d1.clients(), d2->clients());
+
+  for (size_t i = 0; i < d1.clients(); i++) {
+    ASSERT(d1.address(i)->equals(d2->address(i)));
+    ASSERT_EQ(d1.port(i), d2->port(i));
+  }
+  delete d2;
+}
