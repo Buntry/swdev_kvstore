@@ -51,6 +51,23 @@ public:
       push_back(unpacks(bytes));
     }
   }
+
+  void serialize(Serializer &ser) {
+    for (size_t i = 0; i < size(); i++) {
+      get(i)->serialize(ser);
+    }
+  }
+
+  SerializableStringArray *deserialize(Deserializer &dser) {
+    SerializableStringArray *sa = new SerializableStringArray();
+    size_t len = dser.read_size_t();
+
+    for (size_t i = 0; i < len; i++) {
+      push_back(String::deserialize(dser));
+    }
+
+    return sa;
+  }
 };
 
 /** Represents a IntArray that is serializable.
@@ -73,6 +90,23 @@ public:
       push_back(unpacki(bytes));
     }
   }
+
+  void serialize(Serializer &ser) {
+    for (size_t i = 0; i < size(); i++) {
+      ser.write(get(i));
+    }
+  }
+
+  SerializableIntArray *deserialize(Deserializer &dser) {
+    SerializableIntArray *sa = new SerializableIntArray();
+    size_t len = dser.read_size_t();
+
+    for (size_t i = 0; i < len; i++) {
+      push_back(dser.read_int());
+    }
+
+    return sa;
+  }
 };
 
 /** Represents a DoubleArray that is serializable.
@@ -94,6 +128,23 @@ public:
     for (size_t i = 0; i < len; i++) {
       push_back(unpackd(bytes));
     }
+  }
+
+  void serialize(Serializer &ser) {
+    for (size_t i = 0; i < size(); i++) {
+      ser.write(get(i));
+    }
+  }
+
+  SerializableDoubleArray *deserialize(Deserializer &dser) {
+    SerializableDoubleArray *sa = new SerializableDoubleArray();
+    size_t len = dser.read_size_t();
+
+    for (size_t i = 0; i < len; i++) {
+      push_back(dser.read_double());
+    }
+
+    return sa;
   }
 };
 
@@ -127,6 +178,21 @@ public:
   }
 
   virtual size_t num_bytes() { return sizeof(size_t) * 4; }
+
+  virtual void serialize(Serializer &ser) {
+    ser.write(sender_);
+    ser.write(target_);
+    ser.write(id_);
+  }
+
+  virtual Message *deserialize(Deserializer &dser) {
+    Message *m = new Message();
+    m->sender_ = dser.read_size_t();
+    m->target_ = dser.read_size_t();
+    m->id_ = dser.read_size_t();
+
+    return m;
+  }
 };
 
 /** Represents all the information needed to register.
@@ -165,6 +231,29 @@ public:
     memcpy(&client.sin_addr, bytes, sizeof(client.sin_addr));
     advance(bytes, sizeof(client.sin_addr));
     client.sin_port = htons(port);
+  }
+
+  void serialize(Serializer &ser) {
+    Message::serialize(ser);
+    ser.write(client.sin_family);
+    ser.write(client.sin_port);
+    // TODO: fix this: ser.write(client.sin_addr.s_addr);
+    ser.write(client.sin_zero);
+    ser.write(port);
+  }
+
+  Register *deserialize(Deserializer &dser) {
+    Register *r = new Register();
+    r->sender_ = dser.read_size_t();
+    r->target_ = dser.read_size_t();
+    r->id_ = dser.read_size_t();
+    r->client.sin_family = dser.read_int();
+    r->client.sin_port = dser.read_int();
+    r->client.sin_addr.s_addr = dser.read_float();
+    // TODO: Fix this?? r->client.sin_zero = dser.read_char();
+    r->port = dser.read_size_t();
+
+    return r;
   }
 };
 
@@ -211,6 +300,25 @@ public:
     clients = unpackst(bytes);
     addresses.decode(bytes);
     ports.decode(bytes);
+  }
+
+  void serialize(Serializer &ser) {
+    Message::serialize(ser);
+    ser.write(clients);
+    addresses.serialize(ser);
+    ports.serialize(ser);
+  }
+
+  Directory *deserialize(Deserializer &dser) {
+    Directory *d = new Directory();
+    d->sender_ = dser.read_size_t();
+    d->target_ = dser.read_size_t();
+    d->id_ = dser.read_size_t();
+    d->clients = dser.read_size_t();
+    d->addresses.deserialize(dser);
+    d->ports.deserialize(dser);
+
+    return d;
   }
 };
 
@@ -266,6 +374,21 @@ public:
     Message::decode(bytes);
     msg_ = unpacks(bytes);
   }
+
+  void serialize(Serializer &ser) {
+    Message::serialize(ser);
+    ser.write(msg_->c_str(), msg_->size());
+  }
+
+  virtual Put *deserialize(Deserializer &dser) {
+    Put *p = new Put();
+    p->sender_ = dser.read_size_t();
+    p->target_ = dser.read_size_t();
+    p->id_ = dser.read_size_t();
+    p->msg_ = String::deserialize(dser);
+
+    return p;
+  }
 };
 
 /** Represents a Reply: a message that is sent
@@ -304,6 +427,21 @@ public:
     Message::decode(bytes);
     msg_ = unpacks(bytes);
   }
+
+  void serialize(Serializer &ser) {
+    Message::serialize(ser);
+    ser.write(msg_->c_str(), msg_->size());
+  }
+
+  virtual Reply *deserialize(Deserializer &dser) {
+    Reply *r = new Reply();
+    r->sender_ = dser.read_size_t();
+    r->target_ = dser.read_size_t();
+    r->id_ = dser.read_size_t();
+    r->msg_ = String::deserialize(dser);
+
+    return r;
+  }
 };
 
 /** Represents a Get: a message that is sent
@@ -340,6 +478,21 @@ public:
   void decode(char *&bytes) {
     Message::decode(bytes);
     wait_ms_ = unpackst(bytes);
+  }
+
+  void serialize(Serializer &ser) {
+    Message::serialize(ser);
+    ser.write(wait_ms_);
+  }
+
+  virtual WaitAndGet *deserialize(Deserializer &dser) {
+    WaitAndGet *w = new WaitAndGet();
+    w->sender_ = dser.read_size_t();
+    w->target_ = dser.read_size_t();
+    w->id_ = dser.read_size_t();
+    w->wait_ms_ = dser.read_size_t();
+
+    return w;
   }
 };
 
@@ -378,6 +531,21 @@ public:
   void decode(char *&bytes) {
     Message::decode(bytes);
     msg_ = unpacks(bytes);
+  }
+
+  void serialize(Serializer &ser) {
+    Message::serialize(ser);
+    ser.write(msg_->c_str(), msg_->size());
+  }
+
+  virtual Status *deserialize(Deserializer &dser) {
+    Status *s = new Status();
+    s->sender_ = dser.read_size_t();
+    s->target_ = dser.read_size_t();
+    s->id_ = dser.read_size_t();
+    s->msg_ = String::deserialize(dser);
+
+    return s;
   }
 };
 
