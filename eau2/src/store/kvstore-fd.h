@@ -1,6 +1,7 @@
 #pragma once
 // lang: CwC
 
+#include "../client/arg.h"
 #include "../client/network.h"
 #include "../utils/map.h"
 
@@ -20,7 +21,12 @@ public:
   Key(Key &k) : key_(k.key_->clone()), node_(k.node_) {}
 
   /** Hash/Clone functions for storage in a map **/
-  size_t hash() { return key_->hash() ^ node_; }
+  bool equals(Object *other) {
+    Key *that = dynamic_cast<Key *>(other);
+    return (that != nullptr) && (this->key()->equals(that->key())) &&
+           (this->node() == that->node());
+  }
+  size_t hash() { return key_->hash(); }
   Key *clone() { return new Key(*this); }
 
   /** Serializes a key **/
@@ -54,6 +60,7 @@ public:
 
   /** Returns the blob of data. **/
   CharArray *blob() { return blob_; }
+  size_t size() { return blob_->size(); }
 
   /** Serializes a value into a serializer. **/
   void serialize(Serializer &ser) {
@@ -90,19 +97,14 @@ public:
 
   /** Gets a distributed dataframe that is locally hosted on this KV store.  **/
   DataFrame *get(Key *key);
-  // assert(key->node() == index_ && contains_key(key));
-  // Value *from = KVMap::get(key);
-  // Deserializer dser(*from->blob());
-  // Schema *schema = Schema::deserialize(dser);
-  // return new DataFrame(*schema, this);
 
   /** Gets a distributed dataframe that is *not* hosted at this store. **/
   DataFrame *get_and_wait(Key *key);
-  // if (key->node() == index_)
-  //   return get(key);
-
-  // return nullptr;
 
   /** Stores a key and value at the desired node. **/
   void put(Key *key, Value *value);
+
+  /** Private methods on the Key-Value store that return Values. **/
+  Value *get_value(Key *key) { return KVMap::get(key); }
+  Value *get_and_wait_value(Key *key);
 };

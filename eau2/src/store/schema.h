@@ -10,22 +10,31 @@
  * optionally columns and rows can be named by strings.
  * The valid types are represented by the chars 'S', 'B', 'I' and 'F'.
  *
+ * In order to encapsulate distributed schemas, DataFrames also need to know
+ * their current chunk index.
+ *
  * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu
  */
 class Schema : public Object {
 public:
   CharArray *types_;
+  SizeTArray *chunk_indexes_;
   size_t width_ = 0;
   size_t height_ = 0;
 
   /** Copying constructor */
   Schema(Schema &from) {
-    types_ = from.types_->clone();
+    types_ = dynamic_cast<CharArray *>(Util::clone(from.types_));
+    chunk_indexes_ =
+        dynamic_cast<SizeTArray *>(Util::clone(from.chunk_indexes_));
     width_ = from.width_;
   }
 
   /** Create an empty schema **/
-  Schema() { types_ = new CharArray(); }
+  Schema() {
+    types_ = new CharArray();
+    chunk_indexes_ = new SizeTArray();
+  }
 
   /** Create a schema from a string of types. A string that contains
    * characters other than those identifying the four type results in
@@ -33,6 +42,7 @@ public:
    * undefined. **/
   Schema(const char *types) {
     types_ = new CharArray();
+    chunk_indexes_ = new SizeTArray();
 
     for (size_t i = 0; i < strlen(types); i++) {
       add_column(types[i]);
@@ -43,13 +53,17 @@ public:
    * This implementation assume that even though the arguments to a Schema
    * are external, the Schema acquires ownership of everything in its
    * arrays. **/
-  ~Schema() { delete types_; }
+  ~Schema() {
+    delete types_;
+    delete chunk_indexes_;
+  }
 
   /** Add a column of the given type and name (can be nullptr), name
    * is external. Names are expectd to be unique, duplicates result
    * in undefined behavior. */
   void add_column(char typ) {
     types_->push_back(typ);
+    chunk_indexes_->push_back(0);
     width_++;
   }
 
@@ -57,8 +71,12 @@ public:
    * are expectd to be unique, duplicates result in undefined behavior. */
   void add_row() { height_++; }
 
-  /** Return type of column at idx. An idx >= width is undefined. */
-  char col_type(size_t idx) { return types_->get(idx); }
+  /** Return type of column at col. An col >= width is undefined. */
+  char col_type(size_t col) { return types_->get(col); }
+
+  /** Return the current chunk index for a given column. **/
+  size_t chunk_index(size_t col) { return chunk_indexes_->get(col); }
+  void loaded_index(size_t col, size_t idx) { chunk_indexes_->set(col, idx); }
 
   /** The number of columns */
   size_t width() { return width_; }

@@ -48,7 +48,6 @@ class DataFrame : public Object {
 public:
   Schema *scm_;
   ColumnArray cols_;
-  KVStore *store_ = nullptr;
 
   /** Create a data frame with the same columns as the give df but no rows
    * or row names. */
@@ -86,6 +85,8 @@ public:
       delete cols_.get(i);
     }
     delete scm_;
+    delete key_;
+    delete dist_scm_;
   }
 
   /** Returns the dataframe's schema. Modifying the schema after a
@@ -108,16 +109,16 @@ public:
 
   /** Return the value at the given column and row. Accessing rows or
    *  columns out of bounds, or request the wrong type is undefined.*/
-  int get_int(size_t col, size_t row) {
+  int local_get_int(size_t col, size_t row) {
     return cols_.get(col)->as_int()->get(row);
   }
-  bool get_bool(size_t col, size_t row) {
+  bool local_get_bool(size_t col, size_t row) {
     return cols_.get(col)->as_bool()->get(row);
   }
-  float get_float(size_t col, size_t row) {
+  float local_get_float(size_t col, size_t row) {
     return cols_.get(col)->as_float()->get(row);
   }
-  String *get_string(size_t col, size_t row) {
+  String *local_get_string(size_t col, size_t row) {
     return cols_.get(col)->as_string()->get(row);
   }
 
@@ -156,16 +157,16 @@ public:
 
       switch (scm_->col_type(i)) {
       case 'B':
-        row.set(i, get_bool(i, idx));
+        row.set(i, local_get_bool(i, idx));
         break;
       case 'I':
-        row.set(i, get_int(i, idx));
+        row.set(i, local_get_int(i, idx));
         break;
       case 'F':
-        row.set(i, get_float(i, idx));
+        row.set(i, local_get_float(i, idx));
         break;
       case 'S':
-        row.set(i, get_string(i, idx)->clone());
+        row.set(i, local_get_string(i, idx)->clone());
         break;
       default:
         assert(false);
@@ -307,10 +308,119 @@ public:
     return df;
   }
 
-  /** Stores the schema and the first chunk of the given array at  **/
+  /***************************************************************************
+   *  BENEATH THIS ARE ALL IMPLEMENTATION FOR A DISTRIBUTED DATAFRAME
+   * *************************************************************************/
+  KVStore *store_ = nullptr;
+  Key *key_ = nullptr;
+  Schema *dist_scm_ = nullptr;
+  bool is_distributed = false;
+  bool must_load_ = false;
+
+  /** Adds a distributed schema to this DataFrame, consuming the schema. This
+   * schema contains the true dimensions of the data, as well as which chunks
+   * are locally stored. **/
+  void set_distributed_schema_(Key *key, Schema *distributed_schema) {
+    key_ = key->clone();
+    dist_scm_ = distributed_schema;
+    is_distributed = true;
+  }
+
+  /** Enforces that the **/
+  void must_load_on_next_query_() { must_load_ = true; }
+
+  /** Returns the current chunk offset for the given column. **/
+  size_t chunk_offset_(size_t col) { return dist_scm_->chunk_index(col); }
+
+  /** Loads data if it is not currently stored in local storage. Returns whether
+   * or not the data loaded. **/
+  bool load_if_necessary_(size_t col, size_t row) {
+    if (!is_distributed)
+      return false;
+    size_t desired_chunk = row / CHUNK_SIZE;
+    if (!must_load_ && chunk_offset_(col) == desired_chunk) {
+      return false;
+    }
+    must_load_ = false;
+
+    std::cout << "Loading chunk # " << desired_chunk << std::endl;
+
+    // Set up key parameters
+    StrBuff sb;
+    sb.c(*key_->key()).c("-column").c(col).c("-chunk").c(desired_chunk);
+    size_t target = (key_->node() + desired_chunk) % arg.num_nodes;
+
+    // Determine if we should grab this data from another node.
+    Key *chunk_key = new Key(sb.get(), target);
+    Value *val = (target == key_->node())
+                     ? store_->get_value(chunk_key)
+                     : store_->get_and_wait_value(chunk_key);
+    Deserializer dser(*val->blob());
+    delete cols_.set(col, Column::deserialize(dser));
+    dist_scm_->chunk_indexes_->set(col, desired_chunk);
+    return true;
+  }
+
+  /** Normalizes a row index to the current chunk offset for that column. **/
+  size_t normalize_(size_t col, size_t row) {
+    return row - (chunk_offset_(col) * CHUNK_SIZE);
+  }
+
+  /** Gets a float from this distributed dataframe. **/
+  float get_float(size_t col, size_t row) {
+    load_if_necessary_(col, row);
+    return local_get_float(col, normalize_(col, row));
+  }
+
+  /** Distributes an n-by-1 dataframe across the network. Following a protocol:
+   * 1. The schema containing the dimension of the array is stored at the given
+   * Key.
+   * 2. Chunks of the column are stored starting at the first key, wrapping
+   * around in ascending index order. **/
   static DataFrame *fromArray(Key *key, KVStore *kv, size_t sz, float *vals) {
-    Schema s("F");
-    DataFrame *df = new DataFrame(s, kv);
+    Schema *distributed_schema = new Schema("F");
+
+    Schema mt;
+    DataFrame *df = new DataFrame(mt, kv);
+
+    // Get the number of chunks to split the data into
+    size_t rem = sz % CHUNK_SIZE;
+    size_t num_chunks = (sz / CHUNK_SIZE) + 1;
+
+    for (size_t c = 0; c < num_chunks; c++) {
+      FloatColumn fc;
+      size_t limit = (c == num_chunks - 1) ? rem : CHUNK_SIZE;
+      for (size_t i = 0; i < limit; i++) {
+        fc.push_back(vals[c * CHUNK_SIZE + i]);
+        distributed_schema->add_row();
+      }
+
+      if (c == 0) {
+        assert(df->nrows() == 0);
+        df->add_column(&fc);
+        assert(df->nrows() == CHUNK_SIZE);
+      }
+
+      // Serialize and store this chunk of the column.
+      Serializer ser;
+      fc.serialize(ser);
+      Value *value = new Value(*ser.data());
+
+      StrBuff sb;
+      sb.c(*key->key()).c("-column0-chunk").c(c);
+      Key *chunk_key = new Key(sb.get(), (key->node() + c) % arg.num_nodes);
+      kv->put(chunk_key, value);
+      delete chunk_key;
+    }
+
+    Serializer ser;
+    distributed_schema->serialize(ser);
+    Value *schema_value = new Value(*ser.data());
+    kv->put(key, schema_value);
+
+    // Let the df know about its true schema
+    df->set_distributed_schema_(key, distributed_schema);
+    return df;
   }
 };
 

@@ -121,10 +121,10 @@ TEST_F(DataFrameTest, MultipleColumnsAndNewRow) {
   df.add_row(r);
 
   // Check that you can get column values
-  ASSERT_EQ(df.get_int(0, 4), 5);
-  ASSERT_EQ(df.get_float(1, 4), 0.2f);
-  ASSERT(df.get_bool(2, 4));
-  ASSERT(df.get_string(3, 4)->equals(q));
+  ASSERT_EQ(df.local_get_int(0, 4), 5);
+  ASSERT_EQ(df.local_get_float(1, 4), 0.2f);
+  ASSERT(df.local_get_bool(2, 4));
+  ASSERT(df.local_get_string(3, 4)->equals(q));
 
   delete a;
   delete b;
@@ -266,7 +266,7 @@ TEST_F(DataFrameTest, GetLastElement) {
   }
 
   String fb("Foobar");
-  ASSERT(fb.equals(df.get_string(0, 9)));
+  ASSERT(fb.equals(df.local_get_string(0, 9)));
 }
 
 TEST_F(DataFrameTest, TestClone) {
