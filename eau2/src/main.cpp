@@ -1,3 +1,5 @@
+#include "apps/test.h"
+#include "client/application.h"
 #include "client/arg.h"
 #include "client/network-ip.h"
 #include "client/network-pseudo.h"
@@ -23,11 +25,41 @@ Network *get_network() {
   }
 }
 
+/** Runs applications concurrently via threads. **/
+class ApplicationThread : public Thread {
+public:
+  Application *app = nullptr;
+  ~ApplicationThread() { delete app; }
+  void run() { app->start(); }
+};
+
+/** Select application type. **/
+Application *get_app(size_t index, Network *network) {
+  if (strcmp(arg.app, "test") == 0) {
+    return new TestApp(index, network);
+  }
+  // else if (strcmp(arg.app, "trivial") == 0) {
+  //   return new Trivial(index, network);
+  // }
+  assert(false);
+}
+
 int main(int argc, char **argv) {
   arg.parse(argc, argv);
   assert(arg.num_nodes != 0); // Ensure there is at least one node
 
   Network *network = get_network();
+  if (arg.pseudo_network) {
+    ApplicationThread *threads = new ApplicationThread[arg.num_nodes];
+    for (size_t i = 0; i < arg.num_nodes; i++) {
+      threads[i].app = get_app(i, network);
+      threads[i].start();
+    }
+    for (size_t i = 0; i < arg.num_nodes; i++) {
+      threads[i].join();
+    }
+    delete[] threads;
+  }
 
   delete network;
 }

@@ -22,4 +22,10 @@ public:
 
   /** Runs this application, meant to be overridded. **/
   virtual void run_() { assert(false); }
+
+  /** Starts this application. **/
+  void start() {
+    network_->register_node(index_);
+    run_();
+  }
 };

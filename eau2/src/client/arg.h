@@ -7,7 +7,7 @@ static void usage(const char *arg0) {
   fprintf(stderr,
           "Usage: %s [-ip IPV4_ADDRESS] [-port PORT_NUM] "
           "[-server_ip IPV4_ADDRESS] [-server_port PORT_NUM] "
-          "[-index NUMBER] [-nodes NUMBER]\n"
+          "[-index NUMBER] [-nodes NUMBER] [-app APP_NAME]\n"
           "Example: %s -ip 102.168.0.1\n"
           "         %s -ip 192.168.1.1 -port 8080\n",
           arg0, arg0, arg0);
@@ -26,6 +26,9 @@ public:
   size_t server_port = 8080;
   bool pseudo_network = false;
   bool is_server = true;
+  char *app = strdup("test");
+
+  ~Arguments() { delete[] app; }
 
   void parse(int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
@@ -47,6 +50,8 @@ public:
         num_nodes = strtoul(argv[i + 1], NULL, 10);
       } else if (eq_("-pseudo", argv[i])) {
         pseudo_network = true;
+      } else if (eq_("-app", argv[i]) && i + 1 < argc) {
+        app = argv[i + 1];
       }
     }
   }
