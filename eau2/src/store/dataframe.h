@@ -356,6 +356,7 @@ public:
                      ? store_->get_value(chunk_key)
                      : store_->get_and_wait_value(chunk_key);
     Deserializer dser(*val->blob());
+    delete chunk_key;
     delete cols_.set(col, Column::deserialize(dser));
     dist_scm_->chunk_indexes_->set(col, desired_chunk);
     return true;
@@ -396,9 +397,7 @@ public:
       }
 
       if (c == 0) {
-        assert(df->nrows() == 0);
         df->add_column(&fc);
-        assert(df->nrows() == CHUNK_SIZE);
       }
 
       // Serialize and store this chunk of the column.
@@ -415,11 +414,39 @@ public:
 
     Serializer ser;
     distributed_schema->serialize(ser);
-    Value *schema_value = new Value(*ser.data());
-    kv->put(key, schema_value);
+    kv->put(key, new Value(*ser.data()));
 
     // Let the df know about its true schema
     df->set_distributed_schema_(key, distributed_schema);
+    return df;
+  }
+
+  /** Stores a 1-by-1 dataframe at the given node in the KVStore. **/
+  static DataFrame *fromScalar(Key *key, KVStore *kv, float value) {
+    Schema *distributed_schema = new Schema("F");
+
+    FloatColumn fc(1, value);
+    distributed_schema->add_row();
+    Schema mt;
+
+    DataFrame *df = new DataFrame(mt, kv);
+    df->add_column(&fc);
+    df->set_distributed_schema_(key, distributed_schema);
+
+    // Add the chunk with one value.
+    StrBuff sb;
+    sb.c(*key->key()).c("-column0-chunk0");
+    Serializer fc_ser;
+    fc.serialize(fc_ser);
+    Key *chunk_key = new Key(sb.get(), key->node());
+    kv->put(chunk_key, new Value(*fc_ser.data()));
+    delete chunk_key;
+
+    // Also put the distributed schema value.
+    Serializer ser;
+    distributed_schema->serialize(ser);
+    kv->put(key, new Value(*ser.data()));
+
     return df;
   }
 };

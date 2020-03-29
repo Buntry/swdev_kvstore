@@ -32,3 +32,6 @@ pseudo: build
 	
 triv: build
 	./a.out -pseudo -num_nodes 1 -app trivial
+
+demo: build
+	./a.out -pseudo -num_nodes 3 -app demo

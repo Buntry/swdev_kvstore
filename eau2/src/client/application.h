@@ -27,7 +27,10 @@ public:
 
   /** Starts this application. **/
   void start() {
-    network_->register_node(index_);
+    store_.start_service();
     run_();
   }
+
+  /** Stops this application. **/
+  void stop() { store_.stop_service(); }
 };

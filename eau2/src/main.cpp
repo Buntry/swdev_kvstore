@@ -1,9 +1,12 @@
+#include "apps/demo.h"
 #include "apps/test.h"
 #include "apps/trivial.h"
+
 #include "client/application.h"
 #include "client/arg.h"
 #include "client/network-ip.h"
 #include "client/network-pseudo.h"
+
 #include "utils/serializer.h"
 
 Arguments arg;
@@ -40,6 +43,8 @@ Application *get_app(size_t index, Network *network) {
     return new TestApp(index, network);
   } else if (strcmp(arg.app, "trivial") == 0) {
     return new Trivial(index, network);
+  } else if (strcmp(arg.app, "demo") == 0) {
+    return new Demo(index, network);
   }
   assert(false);
 }

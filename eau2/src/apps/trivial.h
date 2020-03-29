@@ -28,10 +28,16 @@ public:
       should_be_same_sum += df2->get_float(0, i);
     }
 
-    assert(sum == should_be_same_sum);
+    if (sum == should_be_same_sum) {
+      pln("SUCCESS");
+    } else {
+      pln("FAILURE");
+    }
 
     delete[] vals;
     delete df;
     delete df2;
+
+    stop();
   }
 };

@@ -4,9 +4,12 @@
 #include <arpa/inet.h>
 
 #include "../store/column.h"
+#include "../store/kv.h"
+#include "../utils/queue.h"
+#include "../utils/thread.h"
 
 /** Represents the types of messages a node can send over the network. **/
-enum class MsgKind { Status, Register, Directory };
+enum class MsgKind { Status, Register, Directory, Kill, Get, Put, Reply };
 
 /** Represents a message.
  *  @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
@@ -145,11 +148,97 @@ public:
   ~Status() { delete msg_; }
   String *s() { return msg_; }
 
-  virtual void serialize(Serializer &ser) { ser.write(msg_); }
+  virtual void serialize(Serializer &ser) {
+    Message::serialize(ser);
+    ser.write(msg_);
+  }
 
   virtual Status *deserialize(Deserializer &dser) {
+    Message::deserialize(dser);
     msg_ = String::deserialize(dser);
     return this;
+  }
+};
+
+/** Represents a message to cease running.
+ * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
+class Kill : public Message {
+public:
+  Kill() { kind_ = MsgKind::Kill; }
+};
+
+/** Represents a request for the value associated with the given key.
+ * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
+class Get : public Message {
+public:
+  Key *key_ = nullptr;
+
+  Get() { kind_ = MsgKind::Get; }
+  Get(Key *key) : Get() { key_ = key; }
+  ~Get() { delete key_; }
+  void set(Key *key) { key_ = key; }
+
+  Key *key() { return key_; }
+
+  void serialize(Serializer &ser) {
+    Message::serialize(ser);
+    key_->serialize(ser);
+  }
+
+  Get *deserialize(Deserializer &dser) {
+    Message::deserialize(dser);
+    key_ = Key::deserialize(dser);
+    return this;
+  }
+};
+
+/** Represents a request to place the key and value pair at the given node.
+ * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
+class Put : public Message {
+public:
+  Key *key_ = nullptr;
+  Value *value_ = nullptr;
+
+  Put() { kind_ = MsgKind::Put; }
+  Put(Key *key, Value *value) : Put() {
+    key_ = key;
+    value_ = value;
+  }
+  ~Put() {
+    delete key_;
+    delete value_;
+  }
+
+  void set(Key *key, Value *value) {
+    key_ = key;
+    value_ = value;
+  }
+
+  Key *key() { return key_; }
+  Value *value() { return value_; }
+
+  void serialize(Serializer &ser) {
+    Message::serialize(ser);
+    key_->serialize(ser);
+    value_->serialize(ser);
+  }
+
+  Put *deserialize(Deserializer &dser) {
+    Message::deserialize(dser);
+    key_ = Key::deserialize(dser);
+    value_ = Value::deserialize(dser);
+    return this;
+  }
+};
+
+/** Represents a response to a get request with the corresponding data.
+ * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
+class Reply : public Put {
+public:
+  Reply() { kind_ = MsgKind::Reply; }
+  Reply(Key *key, Value *value) : Reply() {
+    key_ = key;
+    value_ = value;
   }
 };
 
@@ -167,6 +256,15 @@ Message *Message::from(Deserializer &dser) {
   case MsgKind::Status:
     msg = new Status();
     break;
+  case MsgKind::Kill:
+    msg = new Kill();
+    break;
+  case MsgKind::Get:
+    msg = new Get();
+    break;
+  case MsgKind::Reply:
+    msg = new Reply();
+    break;
   default:
     msg = nullptr;
     break;
@@ -174,6 +272,32 @@ Message *Message::from(Deserializer &dser) {
   msg->deserialize(dser);
   return msg;
 }
+
+generate_object_classqueue(MessageQueue, Message);
+
+/** Represents a Message Queue that is concurrent. **/
+class ConcurrentMessageQueue : public MessageQueue {
+public:
+  Lock lock_;
+
+  /** Pushes a message while locking the queue. **/
+  void push(Message *m) {
+    lock_.lock();
+    MessageQueue::push(m);
+    lock_.notify_all();
+    lock_.unlock();
+  }
+
+  /** Pops a message while locking the queue. **/
+  Message *pop() {
+    lock_.lock();
+    while (size() == 0)
+      lock_.wait();
+    Message *hold = MessageQueue::pop();
+    lock_.unlock();
+    return hold;
+  }
+};
 
 // /** Represents an Ack: an acknowledgement Message
 //  * that a message was properly received.
