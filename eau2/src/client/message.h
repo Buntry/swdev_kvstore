@@ -3,21 +3,10 @@
 
 #include <arpa/inet.h>
 
-#include "../store/dataframe.h"
+#include "../store/column.h"
 
 /** Represents the types of messages a node can send over the network. **/
-enum class MsgKind {
-  Ack,
-  Nack,
-  Put,
-  Reply,
-  Get,
-  WaitAndGet,
-  Status,
-  Kill,
-  Register,
-  Directory
-};
+enum class MsgKind { Status, Register, Directory };
 
 /** Represents a message.
  *  @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
@@ -98,8 +87,8 @@ public:
  * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
 class Directory : public Message {
 public:
-  StringColumn *addresses_;
-  IntColumn *ports_;
+  StringColumn *addresses_ = nullptr;
+  IntColumn *ports_ = nullptr;
   size_t clients_;
 
   Directory() {
@@ -145,6 +134,26 @@ public:
   }
 };
 
+/** Represents a Status message with one string inside of it.
+ * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
+class Status : public Message {
+public:
+  String *msg_ = nullptr;
+
+  Status() {}
+  Status(String *msg) : msg_(msg) { kind_ = MsgKind::Status; }
+  ~Status() { delete msg_; }
+  String *s() { return msg_; }
+
+  virtual void serialize(Serializer &ser) { ser.write(msg_); }
+
+  virtual Status *deserialize(Deserializer &dser) {
+    msg_ = String::deserialize(dser);
+    return this;
+  }
+};
+
+/** Acquires a message from a deserializer object. **/
 Message *Message::from(Deserializer &dser) {
   MsgKind kind = static_cast<MsgKind>(dser.peek_size_t());
   Message *msg;
@@ -154,6 +163,9 @@ Message *Message::from(Deserializer &dser) {
     break;
   case MsgKind::Directory:
     msg = new Directory();
+    break;
+  case MsgKind::Status:
+    msg = new Status();
     break;
   default:
     msg = nullptr;

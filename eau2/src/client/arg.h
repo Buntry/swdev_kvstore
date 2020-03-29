@@ -26,9 +26,7 @@ public:
   size_t server_port = 8080;
   bool pseudo_network = false;
   bool is_server = true;
-  char *app = strdup("test");
-
-  ~Arguments() { delete[] app; }
+  char *app = nullptr;
 
   void parse(int argc, char **argv) {
     for (int i = 1; i < argc; i++) {

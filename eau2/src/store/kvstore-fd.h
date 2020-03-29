@@ -10,14 +10,14 @@ class DataFrame;
 /** A Key that represents where data is stored. **/
 class Key : public Object {
 public:
-  String *key_ = nullptr; // Represents the name of the key
-  size_t node_ = 0;       // Represents the location of where the data is
+  String *key_; // Represents the name of the key
+  size_t node_; // Represents the location of where the data is
 
   /** Various ways to construct a Key **/
-  Key(String &key, size_t node) : node_(node) { key_ = key.clone(); }
-  Key(String *key, size_t node) : node_(node), key_(key) {}
-  Key(const char *key, size_t node) : node_(node) { key_ = new String(key); }
-  Key(Key &k) : node_(k.node_), key_(k.key_->clone()) {}
+  Key(String &key, size_t node) : key_(key.clone()), node_(node) {}
+  Key(String *key, size_t node) : key_(key), node_(node) {}
+  Key(const char *key, size_t node) : key_(new String(key)), node_(node) {}
+  Key(Key &k) : key_(k.key_->clone()), node_(k.node_) {}
 
   /** Hash/Clone functions for storage in a map **/
   size_t hash() { return key_->hash() ^ node_; }
@@ -82,8 +82,8 @@ generate_classmap(KVMap, KVNode, KeyArray, ValueArray, Key *, Value *);
 /** Represents a Key-Value Store from a network. **/
 class KVStore : public KVMap {
 public:
-  Network *network_ = nullptr;
   size_t index_;
+  Network *network_ = nullptr;
 
   /** Creates a KVStore at a given index and with a given network. **/
   KVStore(size_t index, Network *network) : index_(index), network_(network) {}

@@ -16,11 +16,11 @@ build: ./src/main.cpp
 
 # Run the mainfile
 run: build
-	./a.out
+	./a.out -pseudo -num_nodes 3 -app test
 
 # Valgrind the mainfile
 valgr: build
-	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes -v ./a.out -pseudo -num_nodes 3
+	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes -v ./a.out -pseudo -num_nodes 3 -app test
 
 # Cleans only the compiled binaries and datafiles
 clean:
@@ -28,4 +28,4 @@ clean:
 
 # Examples of running our application
 pseudo: build
-	./a.out -pseudo -num_nodes 3
+	./a.out -pseudo -num_nodes 3 -app test
