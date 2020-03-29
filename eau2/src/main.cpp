@@ -1,4 +1,5 @@
 #include "apps/test.h"
+#include "apps/trivial.h"
 #include "client/application.h"
 #include "client/arg.h"
 #include "client/network-ip.h"
@@ -37,10 +38,9 @@ public:
 Application *get_app(size_t index, Network *network) {
   if (strcmp(arg.app, "test") == 0) {
     return new TestApp(index, network);
+  } else if (strcmp(arg.app, "trivial") == 0) {
+    return new Trivial(index, network);
   }
-  // else if (strcmp(arg.app, "trivial") == 0) {
-  //   return new Trivial(index, network);
-  // }
   assert(false);
 }
 
@@ -59,6 +59,8 @@ int main(int argc, char **argv) {
       threads[i].join();
     }
     delete[] threads;
+  } else {
+    assert(false);
   }
 
   delete network;

@@ -67,13 +67,11 @@ TEST_F(DataFrameTest, Cols) {
   Schema s;
   DataFrame df(s);
 
-  df.add_column(nebc, a);
-  df.add_column(nebc, b);
+  df.add_column(nebc);
+  df.add_column(nebc);
 
   ASSERT_EQ(df.ncols(), 2);
   ASSERT_EQ(df.nrows(), 3);
-  ASSERT_EQ(df.get_col(*a), 0);
-  ASSERT_EQ(df.get_col(*b), 1);
 }
 
 TEST_F(DataFrameTest, MultipleColumnsAndNewRow) {
@@ -103,10 +101,10 @@ TEST_F(DataFrameTest, MultipleColumnsAndNewRow) {
   StringColumn *sc = new StringColumn(4, a, a, a, a);
 
   // Add to DataFrame
-  df.add_column(ic, b);
-  df.add_column(fc, c);
-  df.add_column(bc, d);
-  df.add_column(sc, e);
+  df.add_column(ic);
+  df.add_column(fc);
+  df.add_column(bc);
+  df.add_column(sc);
 
   // Check DataFrame dimensions
   ASSERT_EQ(df.ncols(), 4);
@@ -174,7 +172,7 @@ TEST_F(DataFrameTest, AddClone) {
   ASSERT(fc_clone != nullptr);
 
   // Add the clone to the DataFrame
-  df.add_column(fc_clone, a);
+  df.add_column(fc_clone);
 
   ASSERT_EQ(df.get_schema().col_type(0), 'I');
   ASSERT_EQ(df.get_schema().col_type(1), 'I');
@@ -193,8 +191,8 @@ TEST_F(DataFrameTest, SchemaLength) {
   String *b = new String("world");
 
   // Add two rows to Schema
-  s.add_row(a);
-  s.add_row(b);
+  s.add_row();
+  s.add_row();
 
   // Create a new DataFrame with Schema 'BBB'
   DataFrame df(s);
@@ -246,36 +244,13 @@ TEST_F(DataFrameTest, GetSchema2) {
   BoolColumn *bc = new BoolColumn(4, true, false, false, true);
 
   // Add the new column
-  df.add_column(bc, a);
+  df.add_column(bc);
 
   // Check that the new Schema is equal to 'FB'
   ASSERT(df.get_schema().equals(s2));
 
   delete s;
   delete s2;
-  delete a;
-  delete bc;
-}
-
-TEST_F(DataFrameTest, GetRowName) {
-  // An empty Schema
-  Schema s;
-
-  // Create a new DataFrame with the empty Schema
-  DataFrame df(s);
-
-  // A String for the name of a new Column.
-  String *a = new String("test");
-
-  // A BoolColumn with four values.
-  BoolColumn *bc = new BoolColumn(4, true, false, false, true);
-
-  // Add column to DataFrame
-  df.add_column(bc, a);
-
-  // Check that the index of this Column is 0.
-  ASSERT_EQ(df.get_col(*a), 0);
-
   delete a;
   delete bc;
 }

@@ -319,6 +319,19 @@ TEST_F(SerializerTest, Directory) {
   delete d2;
 }
 
+TEST_F(SerializerTest, Status) {
+  Status *s1 = new Status(new String("FUBAR"));
+  ser.write(s1);
+
+  Deserializer dser(*ser.data());
+  Status *s2 = new Status();
+  s2->deserialize(dser);
+
+  ASSERT(s1->s()->equals(s2->s()));
+  delete s1;
+  delete s2;
+}
+
 TEST_F(SerializerTest, MsgFrom) {
   Directory d1;
   String ip1("127.0.0.1");

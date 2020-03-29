@@ -57,7 +57,6 @@ public:
   /** Create a data frame from a schema. */
   DataFrame(Schema &schema) {
     scm_ = new Schema(schema);
-    scm_->purge_rows();
     for (size_t i = 0; i < scm_->width(); i++) {
       switch (scm_->col_type(i)) {
       case 'B':
@@ -96,14 +95,14 @@ public:
   /** Adds a column this dataframe, updates the schema, the new column
    * is external, and appears as the last column of the dataframe, the
    * name is optional and external. A nullptr colum is undefined. */
-  void add_column(Column *col, String *name) {
+  void add_column(Column *col) {
     // If this is our first column, grow the schema's rows to fit it.
     if (ncols() == 0) {
       for (size_t i = 0; i < col->size(); i++) {
-        scm_->add_row(nullptr);
+        scm_->add_row();
       }
     }
-    scm_->add_column(col->get_type(), name);
+    scm_->add_column(col->get_type());
     cols_.push_back(col->clone());
   }
 
@@ -121,12 +120,6 @@ public:
   String *get_string(size_t col, size_t row) {
     return cols_.get(col)->as_string()->get(row);
   }
-
-  /** Return the offset of the given column name or -1 if no such col. */
-  int get_col(String &col) { return scm_->col_idx(col.c_str()); }
-
-  /** Return the offset of the given row name or -1 if no such row. */
-  int get_row(String &row) { return scm_->row_idx(row.c_str()); }
 
   /** Set the value at the given column and row to the given value.
    * If the column is not  of the right type or the indices are out of
@@ -203,7 +196,7 @@ public:
       }
     }
 
-    scm_->add_row(nullptr);
+    scm_->add_row();
   }
 
   /** The number of rows in the dataframe. */
@@ -309,17 +302,15 @@ public:
     Schema s;
     DataFrame *df = new DataFrame(s);
     for (size_t i = 0; i < ncols(); i++) {
-      df->add_column(cols_.get(i), nullptr);
+      df->add_column(cols_.get(i));
     }
     return df;
   }
 
-  /** Forward declaration of fromArray **/
-  // DataFrame::fromArray(&key, this_store(), SZ, vals);
-  static DataFrame *fromArray(Key *key, KVStore *kv, size_t amount,
-                              float *values) {
+  /** Stores the schema and the first chunk of the given array at  **/
+  static DataFrame *fromArray(Key *key, KVStore *kv, size_t sz, float *vals) {
     Schema s("F");
-    return new DataFrame(s);
+    DataFrame *df = new DataFrame(s, kv);
   }
 };
 

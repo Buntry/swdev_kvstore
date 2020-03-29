@@ -29,3 +29,6 @@ clean:
 # Examples of running our application
 pseudo: build
 	./a.out -pseudo -num_nodes 3 -app test
+	
+triv: build
+	./a.out -pseudo -num_nodes 1 -app trivial
