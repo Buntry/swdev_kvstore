@@ -2,7 +2,8 @@
 #pragma once
 
 #include "../utils/thread.h"
-#include "column.h"
+#include "kvstore-fd.h"
+#include "rows.h"
 
 /** Static variable for number of rows before we consider multi-threading. **/
 /** This will also be used as a number of when to determine the amount of
@@ -11,350 +12,6 @@ static const size_t MIN_NROWS_PER_THREAD = 500000;
 
 /** This makes sure we don't go overboard with our number of threads. **/
 static const size_t MAX_NUM_THREADS = 8;
-
-/*************************************************************************
- * Schema::
- * A schema is a description of the contents of a data frame, the schema
- * knows the number of columns and number of rows, the type of each column,
- * optionally columns and rows can be named by strings.
- * The valid types are represented by the chars 'S', 'B', 'I' and 'F'.
- *
- * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu
- */
-class Schema : public Object {
-public:
-  CharArray *types_;
-  StringArray *rows_;
-  StringArray *cols_;
-
-  /** Copying constructor */
-  Schema(Schema &from) {
-    types_ = from.types_->clone();
-    rows_ = from.rows_->clone();
-    cols_ = from.cols_->clone();
-  }
-
-  /** Create an empty schema **/
-  Schema() {
-    types_ = new CharArray();
-    rows_ = new StringArray();
-    cols_ = new StringArray();
-  }
-
-  /** Create a schema from a string of types. A string that contains
-   * characters other than those identifying the four type results in
-   * undefined behavior. The argument is external, a nullptr argument is
-   * undefined. **/
-  Schema(const char *types) {
-    types_ = new CharArray();
-    rows_ = new StringArray();
-    cols_ = new StringArray();
-
-    for (size_t i = 0; i < strlen(types); i++) {
-      add_column(types[i], nullptr);
-    }
-  }
-
-  /** Destructor for Schema.
-   * This implementation assume that even though the arguments to a Schema
-   * are external, the Schema acquires ownership of everything in its
-   * arrays. **/
-  ~Schema() {
-    for (size_t i = 0; i < width(); i++) {
-      delete cols_->get(i);
-    }
-
-    for (size_t i = 0; i < length(); i++) {
-      delete rows_->get(i);
-    }
-
-    delete types_;
-    delete cols_;
-    delete rows_;
-  }
-
-  /** Add a column of the given type and name (can be nullptr), name
-   * is external. Names are expectd to be unique, duplicates result
-   * in undefined behavior. */
-  void add_column(char typ, String *name) {
-    types_->push_back(typ);
-    cols_->push_back(Util::clone(name));
-  }
-
-  /** Add a row with a name (possibly nullptr), name is external.  Names
-   * are expectd to be unique, duplicates result in undefined behavior. */
-  void add_row(String *name) { rows_->push_back(Util::clone(name)); }
-
-  /** Return name of row at idx; nullptr indicates no name. An idx >=
-   * width is undefined. */
-  String *row_name(size_t idx) { return rows_->get(idx); }
-
-  /** Return name of column at idx; nullptr indicates no name given.
-   *  An idx >= width is undefined.*/
-  String *col_name(size_t idx) { return cols_->get(idx); }
-
-  /** Return type of column at idx. An idx >= width is undefined. */
-  char col_type(size_t idx) { return types_->get(idx); }
-
-  /** Given a column name return its index, or -1. */
-  int col_idx(const char *name) {
-    String s(name);
-    size_t idx;
-
-    return ((idx = cols_->index_of(&s)) < width()) ? idx : -1;
-  }
-
-  /** Given a row name return its index, or -1. */
-  int row_idx(const char *name) {
-    String s(name);
-    size_t idx;
-
-    return ((idx = rows_->index_of(&s)) < width()) ? idx : -1;
-  }
-
-  /** The number of columns */
-  size_t width() { return cols_->size(); }
-
-  /** The number of rows */
-  size_t length() { return rows_->size(); }
-
-  /** A helper function that clears the row names */
-  void purge_rows() {
-    for (size_t i = 0; i < rows_->size(); i++) {
-      delete rows_->get(i);
-    }
-    rows_->clear();
-  }
-
-  /** Schema equality is purely based on column type. **/
-  bool equals(Object *other) {
-    Schema *that = dynamic_cast<Schema *>(other);
-    return (that != nullptr) && (this->width() == that->width()) &&
-           types_->equals(that->types_);
-  }
-
-  /** Hash function is redefined st. if two schemas are equal,
-   * then they must have the same hash. **/
-  size_t hash() {
-    size_t hash = 0;
-    for (size_t i = 0; i < this->width(); i++) {
-      hash += col_type(i);
-    }
-    return hash;
-  }
-
-  /** Serializes a schema onto an object. Does not serialize row/col names. **/
-  void serialize(Serializer &ser) {
-    ser.write(width());
-    for (size_t i = 0; i < width(); i++) {
-      ser.write(col_type(i));
-    }
-  }
-
-  /** Deserializes a schema from a deserializer. **/
-  static Schema *deserialize(Deserializer &dser) {
-    Schema *schema = new Schema();
-    size_t width = dser.read_size_t();
-    for (size_t i = 0; i < width; i++) {
-      schema->add_column(dser.read_char(), nullptr);
-    }
-    return schema;
-  }
-};
-
-/*****************************************************************************
- * Fielder::
- * A field vistor invoked by Row.
- *
- * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu
- */
-class Fielder : public Object {
-public:
-  /** Called before visiting a row, the argument is the row offset in the
-    dataframe. */
-  virtual void start(size_t r) {}
-
-  /** Called for fields of the argument's type with the value of the
-     field. */
-  virtual void accept(bool b) {}
-  virtual void accept(float f) {}
-  virtual void accept(int i) {}
-  virtual void accept(String *s) {}
-
-  /** Called when all fields have been seen. */
-  virtual void done() {}
-};
-
-/*************************************************************************
- * Row::
- *
- * This class represents a single row of data constructed according to a
- * dataframe's schema. The purpose of this class is to make it easier to add
- * read/write complete rows. Internally a dataframe hold data in columns.
- * Rows have pointer equality.
- *
- * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu
- */
-class Row : public Object {
-public:
-  Schema *scm_;
-  ColumnArray cols_;
-  size_t row_idx_;
-
-  /** Build a row following a schema. */
-  Row(Schema &scm) {
-    row_idx_ = 0;
-    scm_ = new Schema(scm);
-    for (size_t i = 0; i < scm_->width(); i++) {
-      switch (scm_->col_type(i)) {
-      case 'B':
-        cols_.push_back(new BoolColumn());
-        break;
-      case 'I':
-        cols_.push_back(new IntColumn());
-        break;
-      case 'F':
-        cols_.push_back(new FloatColumn());
-        break;
-      case 'S':
-        cols_.push_back(new StringColumn());
-        break;
-      }
-      cols_.get(i)->push_back_missing();
-    }
-  }
-
-  /** Destructor for a Row **/
-  ~Row() {
-    for (size_t i = 0; i < scm_->width(); i++) {
-      delete cols_.get(i);
-    }
-    delete scm_;
-  }
-
-  /** Setters: set the given column with the given value. Setting a column
-   * with a value of the wrong type is undefined. */
-  void set(size_t col, int val) { cols_.get(col)->as_int()->set(0, val); }
-  void set(size_t col, float val) { cols_.get(col)->as_float()->set(0, val); }
-  void set(size_t col, bool val) { cols_.get(col)->as_bool()->set(0, val); }
-  /** Acquire ownership of the string. */
-  void set(size_t col, String *val) {
-    cols_.get(col)->as_string()->set(0, val);
-  }
-  /** Sets the given column to missing **/
-  void set_missing(size_t col) { cols_.get(col)->set_missing(0); }
-
-  /** Set/get the index of this row (ie. its position in the dataframe.
-   * This is only used for informational purposes, unused otherwise */
-  void set_idx(size_t idx) { row_idx_ = idx; }
-  size_t get_idx() { return row_idx_; }
-
-  /** Getters: get the value at the given column. If the column is not
-   * of the requested type, the result is undefined. */
-  int get_int(size_t col) { return cols_.get(col)->as_int()->get(0); }
-  bool get_bool(size_t col) { return cols_.get(col)->as_bool()->get(0); }
-  float get_float(size_t col) { return cols_.get(col)->as_float()->get(0); }
-  String *get_string(size_t col) { return cols_.get(col)->as_string()->get(0); }
-
-  /** Number of fields in the row. */
-  size_t width() { return scm_->width(); }
-
-  /** Type of the field at the given position. An idx >= width is
-     undefined. */
-  char col_type(size_t idx) { return scm_->col_type(idx); }
-
-  /** Given a Fielder, visit every field of this row. The first argument
-   * is index of the row in the dataframe.
-   * Calling this method before the row's fields have been set is
-   * undefined. */
-  void visit(size_t idx, Fielder &f) {
-    assert(idx == get_idx());
-    f.start(idx);
-    for (size_t i = 0; i < width(); i++) {
-      switch (col_type(i)) {
-      case 'B':
-        f.accept(get_bool(i));
-        break;
-      case 'I':
-        f.accept(get_int(i));
-        break;
-      case 'F':
-        f.accept(get_float(i));
-        break;
-      case 'S':
-        f.accept(get_string(i));
-        break;
-      default:
-        assert(false);
-      }
-    }
-    f.done();
-  }
-};
-
-/*******************************************************************************
- *  Rower::
- *  An interface for iterating through each row of a data frame. The intent
- *  is that this class should subclassed and the accept() method be given
- *  a meaningful implementation. Rowers can be cloned for parallel execution.
- *
- * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu
- */
-class Rower : public Object {
-public:
-  /** This method is called once per row. The row object is on loan and
-      should not be retained as it is likely going to be reused in the next
-      call. The return value is used in filters to indicate that a row
-      should be kept. */
-  virtual bool accept(Row &r) { return false; }
-
-  /** Once traversal of the data frame is complete the rowers that were
-      split off will be joined.  There will be one join per split. The
-      original object will be the last to be called join on. The join
-     method is reponsible for cleaning up memory. */
-  virtual void join_delete(Rower *other) { delete other; }
-
-  /** Satisifies Object properties **/
-  virtual Rower *clone() { return nullptr; }
-};
-
-/*******************************************************************************
- * PrintFielder::
- *
- * Prints fields in SoR format without new lines.
- * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu
- */
-class PrintFielder : public Fielder {
-public:
-  /** Prints the corresponding value surrounded with angle brackets. **/
-  void accept(bool b) { p("<").p(b).p(">"); }
-  void accept(float f) { p("<").p(f).p(">"); }
-  void accept(int i) { p("<").p(i).p(">"); }
-  void accept(String *s) {
-    p("<\"").p((s == nullptr) ? "" : s->c_str()).p("\">");
-  }
-
-  /** Once we're done with the file, print a new line. **/
-  void done() { pln(); }
-};
-
-/*******************************************************************************
- * PrintRower::
- *
- * Prints rows in an SoR file format to standard output.
- * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu
- */
-class PrintRower : public Rower {
-public:
-  PrintFielder pf;
-  bool accept(Row &r) {
-    r.visit(r.get_idx(), pf);
-    return true;
-  }
-};
-
-/** Forward declaration of DataFrame to allow for compilation **/
-class DataFrame;
 
 /*******************************************************************************
  * RowThread::
@@ -399,7 +56,6 @@ public:
   /** Create a data frame from a schema. */
   DataFrame(Schema &schema) {
     scm_ = new Schema(schema);
-    scm_->purge_rows();
     for (size_t i = 0; i < scm_->width(); i++) {
       switch (scm_->col_type(i)) {
       case 'B':
@@ -418,12 +74,19 @@ public:
     }
   }
 
+  /** Create a dataframe from a schema and KVStore. **/
+  DataFrame(Schema &schema, KVStore *store) : DataFrame(schema) {
+    store_ = store;
+  }
+
   /** Destructor for a DataFrame **/
   ~DataFrame() {
     for (size_t i = 0; i < ncols(); i++) {
       delete cols_.get(i);
     }
     delete scm_;
+    delete key_;
+    delete dist_scm_;
   }
 
   /** Returns the dataframe's schema. Modifying the schema after a
@@ -433,37 +96,31 @@ public:
   /** Adds a column this dataframe, updates the schema, the new column
    * is external, and appears as the last column of the dataframe, the
    * name is optional and external. A nullptr colum is undefined. */
-  void add_column(Column *col, String *name) {
+  void add_column(Column *col) {
     // If this is our first column, grow the schema's rows to fit it.
     if (ncols() == 0) {
       for (size_t i = 0; i < col->size(); i++) {
-        scm_->add_row(nullptr);
+        scm_->add_row();
       }
     }
-    scm_->add_column(col->get_type(), name);
+    scm_->add_column(col->get_type());
     cols_.push_back(col->clone());
   }
 
   /** Return the value at the given column and row. Accessing rows or
    *  columns out of bounds, or request the wrong type is undefined.*/
-  int get_int(size_t col, size_t row) {
+  int local_get_int(size_t col, size_t row) {
     return cols_.get(col)->as_int()->get(row);
   }
-  bool get_bool(size_t col, size_t row) {
+  bool local_get_bool(size_t col, size_t row) {
     return cols_.get(col)->as_bool()->get(row);
   }
-  float get_float(size_t col, size_t row) {
+  float local_get_float(size_t col, size_t row) {
     return cols_.get(col)->as_float()->get(row);
   }
-  String *get_string(size_t col, size_t row) {
+  String *local_get_string(size_t col, size_t row) {
     return cols_.get(col)->as_string()->get(row);
   }
-
-  /** Return the offset of the given column name or -1 if no such col. */
-  int get_col(String &col) { return scm_->col_idx(col.c_str()); }
-
-  /** Return the offset of the given row name or -1 if no such row. */
-  int get_row(String &row) { return scm_->row_idx(row.c_str()); }
 
   /** Set the value at the given column and row to the given value.
    * If the column is not  of the right type or the indices are out of
@@ -500,16 +157,16 @@ public:
 
       switch (scm_->col_type(i)) {
       case 'B':
-        row.set(i, get_bool(i, idx));
+        row.set(i, local_get_bool(i, idx));
         break;
       case 'I':
-        row.set(i, get_int(i, idx));
+        row.set(i, local_get_int(i, idx));
         break;
       case 'F':
-        row.set(i, get_float(i, idx));
+        row.set(i, local_get_float(i, idx));
         break;
       case 'S':
-        row.set(i, get_string(i, idx)->clone());
+        row.set(i, local_get_string(i, idx)->clone());
         break;
       default:
         assert(false);
@@ -540,7 +197,7 @@ public:
       }
     }
 
-    scm_->add_row(nullptr);
+    scm_->add_row();
   }
 
   /** The number of rows in the dataframe. */
@@ -646,8 +303,148 @@ public:
     Schema s;
     DataFrame *df = new DataFrame(s);
     for (size_t i = 0; i < ncols(); i++) {
-      df->add_column(cols_.get(i), nullptr);
+      df->add_column(cols_.get(i));
     }
+    return df;
+  }
+
+  /***************************************************************************
+   *  BENEATH THIS ARE ALL IMPLEMENTATION FOR A DISTRIBUTED DATAFRAME
+   * *************************************************************************/
+  KVStore *store_ = nullptr;
+  Key *key_ = nullptr;
+  Schema *dist_scm_ = nullptr;
+  bool is_distributed = false;
+  bool must_load_ = false;
+
+  /** Adds a distributed schema to this DataFrame, consuming the schema. This
+   * schema contains the true dimensions of the data, as well as which chunks
+   * are locally stored. **/
+  void set_distributed_schema_(Key *key, Schema *distributed_schema) {
+    key_ = key->clone();
+    dist_scm_ = distributed_schema;
+    is_distributed = true;
+  }
+
+  /** Enforces that the **/
+  void must_load_on_next_query_() { must_load_ = true; }
+
+  /** Returns the current chunk offset for the given column. **/
+  size_t chunk_offset_(size_t col) { return dist_scm_->chunk_index(col); }
+
+  /** Loads data if it is not currently stored in local storage. Returns whether
+   * or not the data loaded. **/
+  bool load_if_necessary_(size_t col, size_t row) {
+    if (!is_distributed)
+      return false;
+    size_t desired_chunk = row / CHUNK_SIZE;
+    if (!must_load_ && chunk_offset_(col) == desired_chunk) {
+      return false;
+    }
+    must_load_ = false;
+
+    // Set up key parameters
+    StrBuff sb;
+    sb.c(*key_->key()).c("-column").c(col).c("-chunk").c(desired_chunk);
+    size_t target = (key_->node() + desired_chunk) % arg.num_nodes;
+
+    // Determine if we should grab this data from another node.
+    Key *chunk_key = new Key(sb.get(), target);
+    Value *val = (target == store_->index())
+                     ? store_->get_value(chunk_key)
+                     : store_->get_and_wait_value(chunk_key);
+    Deserializer dser(*val->blob());
+    delete chunk_key;
+    delete cols_.set(col, Column::deserialize(dser));
+    dist_scm_->chunk_indexes_->set(col, desired_chunk);
+    return true;
+  }
+
+  /** Normalizes a row index to the current chunk offset for that column. **/
+  size_t normalize_(size_t col, size_t row) {
+    return row - (chunk_offset_(col) * CHUNK_SIZE);
+  }
+
+  /** Gets a float from this distributed dataframe. **/
+  float get_float(size_t col, size_t row) {
+    load_if_necessary_(col, row);
+    return local_get_float(col, normalize_(col, row));
+  }
+
+  /** Distributes an n-by-1 dataframe across the network. Following a protocol:
+   * 1. The schema containing the dimension of the array is stored at the given
+   * Key.
+   * 2. Chunks of the column are stored starting at the first key, wrapping
+   * around in ascending index order. **/
+  static DataFrame *fromArray(Key *key, KVStore *kv, size_t sz, float *vals) {
+    Schema *distributed_schema = new Schema("F");
+
+    Schema mt;
+    DataFrame *df = new DataFrame(mt, kv);
+
+    // Get the number of chunks to split the data into
+    size_t rem = sz % CHUNK_SIZE;
+    size_t num_chunks = (sz / CHUNK_SIZE) + 1;
+
+    for (size_t c = 0; c < num_chunks; c++) {
+      FloatColumn fc;
+      size_t limit = (c == num_chunks - 1) ? rem : CHUNK_SIZE;
+      for (size_t i = 0; i < limit; i++) {
+        fc.push_back(vals[c * CHUNK_SIZE + i]);
+        distributed_schema->add_row();
+      }
+
+      if (c == 0) {
+        df->add_column(&fc);
+      }
+
+      // Serialize and store this chunk of the column.
+      Serializer ser;
+      fc.serialize(ser);
+      Value *value = new Value(*ser.data());
+
+      StrBuff sb;
+      sb.c(*key->key()).c("-column0-chunk").c(c);
+      Key *chunk_key = new Key(sb.get(), (key->node() + c) % arg.num_nodes);
+      kv->put(chunk_key, value);
+      delete chunk_key;
+    }
+
+    Serializer ser;
+    distributed_schema->serialize(ser);
+    kv->put(key, new Value(*ser.data()));
+
+    // Let the df know about its true schema
+    df->set_distributed_schema_(key, distributed_schema);
+    return df;
+  }
+
+  /** Stores a 1-by-1 dataframe at the given node in the KVStore. **/
+  static DataFrame *fromScalar(Key *key, KVStore *kv, float value) {
+    Schema *distributed_schema = new Schema("F");
+
+    FloatColumn fc(1, value);
+    distributed_schema->add_row();
+    Schema mt;
+
+    DataFrame *df = new DataFrame(mt, kv);
+    df->add_column(&fc);
+    df->set_distributed_schema_(key, distributed_schema);
+
+    // Add the chunk with one value.
+    StrBuff sb;
+    sb.c(*key->key()).c("-column0-chunk0");
+    Serializer fc_ser;
+    fc.serialize(fc_ser);
+    Key *chunk_key = new Key(sb.get(), key->node());
+    kv->put(chunk_key, new Value(*fc_ser.data()));
+    delete chunk_key;
+
+    // Also put the distributed schema value.
+    Serializer ser;
+    distributed_schema->serialize(ser);
+    kv->put(key, new Value(*ser.data()));
+
     return df;
   }
 };

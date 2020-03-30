@@ -2,6 +2,7 @@
 // lang::Cpp
 #include "object.h"
 #include "string.h"
+#include <atomic>
 #include <condition_variable>
 #include <cstdlib>
 #include <mutex>

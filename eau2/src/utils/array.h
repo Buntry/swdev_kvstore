@@ -6,7 +6,7 @@
 #include "string.h"
 #include "util.h"
 
-static const size_t CHUNK_SIZE = 1024;
+static const size_t CHUNK_SIZE = 16384;
 
 #define generate_classarray(KlassArray, Stores)                                \
   class KlassArray : public Object {                                           \

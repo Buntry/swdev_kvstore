@@ -146,5 +146,5 @@ generate_classmap(Map, MapNode, Array, Array, Object *, Object *);
 #define generate_object_classmap(KlassMap, KlassArray, Klass)                  \
   class KlassMap : public Map {                                                \
   public:                                                                      \
-    Klass get(Object *key) { return dynamic_cast<Klass *>(Map::get(key)); }    \
+    Klass *get(Object *key) { return dynamic_cast<Klass *>(Map::get(key)); }   \
   }

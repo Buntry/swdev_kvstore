@@ -2,35 +2,7 @@
 // lang: CwC
 
 #include "../utils/map.h"
-#include "../utils/queue.h"
-#include "../utils/thread.h"
 #include "network.h"
-
-generate_object_classqueue(MessageQueue, Message);
-
-/** Represents a Message Queue that is concurrent. **/
-class ConcurrentMessageQueue : public MessageQueue {
-public:
-  Lock lock_;
-
-  /** Pushes a message while locking the queue. **/
-  void push(Message *m) {
-    lock_.lock();
-    MessageQueue::push(m);
-    lock_.notify_all();
-    lock_.unlock();
-  }
-
-  /** Pops a message while locking the queue. **/
-  Message *pop() {
-    lock_.lock();
-    while (size() == 0)
-      lock_.wait();
-    Message *hold = MessageQueue::pop();
-    lock_.unlock();
-    return hold;
-  }
-};
 
 /** Mapping from String to size_t **/
 generate_classmap(SSTMap, SSTNode, StringArray, SizeTArray, String *, size_t);

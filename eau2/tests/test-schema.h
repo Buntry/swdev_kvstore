@@ -55,18 +55,14 @@ TEST_F(SchemaTest, Equals) {
 }
 
 TEST_F(SchemaTest, AddColumn) {
-  schema3->add_column('I', a);
+  schema3->add_column('I');
 
-  ASSERT_EQ(schema3->col_idx(a->c_str()), 0);
-  ASSERT(schema3->col_name(0)->equals(a));
   ASSERT_EQ(schema3->col_type(0), 'I');
 }
 
 TEST_F(SchemaTest, AddRow) {
-  schema4->add_row(a);
-
-  ASSERT_EQ(schema4->row_idx(a->c_str()), 0);
-  ASSERT(schema4->row_name(0)->equals(a));
+  schema4->add_row();
+  ASSERT_EQ(schema4->length(), 1);
 }
 
 TEST_F(SchemaTest, ColType) {
@@ -74,14 +70,4 @@ TEST_F(SchemaTest, ColType) {
   ASSERT_EQ(schema1->col_type(1), 'B');
   ASSERT_EQ(schema1->col_type(2), 'S');
   ASSERT_EQ(schema1->col_type(3), 'F');
-  // Undefined Behavior
-  // ASSERT_EQ(schema3->col_type(0), ' ');
-}
-
-TEST_F(SchemaTest, PurgeRows) {
-  schema2->add_row(a);
-  schema2->add_row(b);
-  schema2->purge_rows();
-
-  ASSERT_EQ(schema2->length(), 0);
 }
