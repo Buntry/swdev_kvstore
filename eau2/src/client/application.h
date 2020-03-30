@@ -33,4 +33,14 @@ public:
 
   /** Stops this application. **/
   void stop() { store_.stop_service(); }
+  void stop_all() {
+    for (size_t i = 0; i < arg.num_nodes; i++) {
+      if (i == index_)
+        continue;
+      Message *kill = new Kill();
+      kill->init(index_, i, 0);
+      network()->send_msg(kill);
+    }
+    stop();
+  }
 };

@@ -20,7 +20,7 @@ run: build
 
 # Valgrind the mainfile
 valgr: build
-	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes -v ./a.out -pseudo -num_nodes 1 -app trivial
+	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes -v ./a.out -pseudo -num_nodes 3 -app demo
 
 # Cleans only the compiled binaries and datafiles
 clean:

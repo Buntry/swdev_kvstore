@@ -39,18 +39,18 @@ public:
     float sum = 0;
     for (size_t i = 0; i < SZ; ++i)
       sum += vals[i] = i;
-    DataFrame::fromArray(main, this_store(), SZ, vals);
-    DataFrame::fromScalar(check, this_store(), sum);
+    delete DataFrame::fromArray(main, this_store(), SZ, vals);
+    delete DataFrame::fromScalar(check, this_store(), sum);
     delete[] vals;
   }
 
   /** Reads in an array of numbers and computes the actual sum. **/
   void counter() {
     DataFrame *v = this_store()->get_and_wait(main);
+
     size_t sum = 0;
     for (size_t i = 0; i < 100 * 1000; ++i)
       sum += v->get_float(0, i);
-    p("The sum is  ").pln(sum);
     DataFrame::fromScalar(verify, this_store(), sum);
   }
 
@@ -60,5 +60,6 @@ public:
     DataFrame *expected = this_store()->get_and_wait(check);
     pln(expected->get_float(0, 0) == result->get_float(0, 0) ? "SUCCESS"
                                                              : "FAILURE");
+    stop_all();
   }
 };

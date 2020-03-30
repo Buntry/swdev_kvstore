@@ -343,8 +343,6 @@ public:
     }
     must_load_ = false;
 
-    std::cout << "Loading chunk # " << desired_chunk << std::endl;
-
     // Set up key parameters
     StrBuff sb;
     sb.c(*key_->key()).c("-column").c(col).c("-chunk").c(desired_chunk);
@@ -352,7 +350,7 @@ public:
 
     // Determine if we should grab this data from another node.
     Key *chunk_key = new Key(sb.get(), target);
-    Value *val = (target == key_->node())
+    Value *val = (target == store_->index())
                      ? store_->get_value(chunk_key)
                      : store_->get_and_wait_value(chunk_key);
     Deserializer dser(*val->blob());

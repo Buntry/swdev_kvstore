@@ -233,12 +233,40 @@ public:
 
 /** Represents a response to a get request with the corresponding data.
  * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu **/
-class Reply : public Put {
+class Reply : public Message {
 public:
+  Key *key_ = nullptr;
+  Value *value_ = nullptr;
+
   Reply() { kind_ = MsgKind::Reply; }
   Reply(Key *key, Value *value) : Reply() {
     key_ = key;
     value_ = value;
+  }
+  ~Reply() {
+    delete key_;
+    delete value_;
+  }
+
+  void set(Key *key, Value *value) {
+    key_ = key;
+    value_ = value;
+  }
+
+  Key *key() { return key_; }
+  Value *value() { return value_; }
+
+  void serialize(Serializer &ser) {
+    Message::serialize(ser);
+    key_->serialize(ser);
+    value_->serialize(ser);
+  }
+
+  Reply *deserialize(Deserializer &dser) {
+    Message::deserialize(dser);
+    key_ = Key::deserialize(dser);
+    value_ = Value::deserialize(dser);
+    return this;
   }
 };
 
@@ -291,8 +319,9 @@ public:
   /** Pops a message while locking the queue. **/
   Message *pop() {
     lock_.lock();
-    while (size() == 0)
+    while (size() == 0) {
       lock_.wait();
+    }
     Message *hold = MessageQueue::pop();
     lock_.unlock();
     return hold;

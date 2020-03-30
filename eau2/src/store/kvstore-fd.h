@@ -54,6 +54,9 @@ public:
     delete ks;
   }
 
+  /** Gets the index of the keyvalue store **/
+  size_t index() { return index_; }
+
   /** Gets a distributed dataframe that is locally hosted on this KV store.  **/
   DataFrame *get(Key *key);
 
