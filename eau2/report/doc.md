@@ -19,8 +19,9 @@ network.
 
 #### Architecture
 
-The codebase is separated into 3 directories.
+The codebase is separated into 4 directories.
 
+- apps: which contain all the sample applications
 - client: which contains all the networking code
 - store: which contains adapter and dataframe
 - utils: which contains all the common components shared throughout the codebase
@@ -40,6 +41,9 @@ Applications internally hold a KVStore that can be used to acquire data across t
 In order to write an application, a user must subclass Application and override the `run_` method.
 To access which node the Application is running on, useful for switching context and assigning different
 jobs for different nodes, there is another method called `size_t this_node()`
+
+Applications should start and wait until they receive a message to stop. I think we are having issues with
+applications stopping prematurely when we are using an IP-based network.
 
 ###### KVStore (Key-Value Store)
 
@@ -62,6 +66,15 @@ Since KVStores only hold columns, DataFrame has a way of placing a column into a
 
 Since KVStores also hold values, there is another method for scalars.
 `DataFrame::fromScalar(Key* key, KVStore *kv, <singular data item>)`
+
+Our protocol for distributing data is as follows:
+At the "main" key, we store a distributed schema containing the true dimensions and types
+of the distributed dataframe.
+
+Columns are separated by chunks, with the first chunk of each column store on the same node
+as the distributed schema, moving to the right with each chunk and wrapping around.
+
+From scalar works the same as if it were called as from array with one value.
 
 #### Use cases
 
@@ -138,8 +151,16 @@ We currently are struggling with our network implementation and are looking
 to have a one-on-one with a professor to figure out how to increase the robusticity
 of our solution.
 
+Our network-pseudo code works for any application we throw at it, but the network-ip
+implementation still stumps us. We're looking for a time and place to find someone who
+can fix these issues.
+
+We're also looking for a way to restructure the KVStore threads (we're currently using 2-layers of threads).
+We have a Servicer and within that a Replier. I want to have a dialogue with a professor about how to
+refactor our KV implementation.
+
 #### Status
 
-We spent this week refactoring and abstracting our utilities code. Our biggest success yet
-is refactoring our Array implementation from 5 different copies of the same code (> 1000 lines)
-down to just under 200.
+We spent this week catching up and basically completing milestones 2 and 3 at the same time. We are
+certainly not happy with the current state of kvstore.h, but we do like our protocol for distributing
+data.

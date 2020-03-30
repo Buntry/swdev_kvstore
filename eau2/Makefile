@@ -36,6 +36,7 @@ triv: build
 triv-net: build
 	./a.out -num_nodes 1 -index 0 -ip 127.0.0.1 -port 8080 -app trivial 
 
+# Here's the Milestone 3 example code.
 demo: build
 	./a.out -pseudo -num_nodes 3 -app demo
 
