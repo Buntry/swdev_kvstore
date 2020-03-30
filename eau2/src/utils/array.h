@@ -7,6 +7,7 @@
 #include "util.h"
 
 static const size_t CHUNK_SIZE = 16384;
+// static const size_t CHUNK_SIZE = 10; // debug chunk size
 
 #define generate_classarray(KlassArray, Stores)                                \
   class KlassArray : public Object {                                           \

@@ -10,6 +10,7 @@ public:
   Key *main = new Key("main", 0);
   Key *verify = new Key("verif", 0);
   Key *check = new Key("ck", 0);
+  size_t SZ = 100 * 1000;
 
   Demo(size_t idx, Network *network) : Application(idx, network) {}
   ~Demo() {
@@ -34,7 +35,6 @@ public:
 
   /** Generates an array of numbers and computes the expected sum. **/
   void producer() {
-    size_t SZ = 100 * 1000;
     float *vals = new float[SZ];
     float sum = 0;
     for (size_t i = 0; i < SZ; ++i)
@@ -49,9 +49,10 @@ public:
     DataFrame *v = this_store()->get_and_wait(main);
 
     size_t sum = 0;
-    for (size_t i = 0; i < 100 * 1000; ++i)
+    for (size_t i = 0; i < SZ; ++i)
       sum += v->get_float(0, i);
-    DataFrame::fromScalar(verify, this_store(), sum);
+    delete DataFrame::fromScalar(verify, this_store(), sum);
+    delete v;
   }
 
   /** Fetches both the actual sum and expected sum and checks them.  **/
@@ -60,6 +61,8 @@ public:
     DataFrame *expected = this_store()->get_and_wait(check);
     pln(expected->get_float(0, 0) == result->get_float(0, 0) ? "SUCCESS"
                                                              : "FAILURE");
+    delete result;
+    delete expected;
     stop_all();
   }
 };

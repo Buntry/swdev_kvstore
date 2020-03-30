@@ -52,6 +52,7 @@ public:
 
   KVStoreReplier(size_t index, KVStore *store, Network *network, Get *get)
       : index_(index), store_(store), network_(network), get_(get) {}
+  ~KVStoreReplier() { delete get_; }
 
   void run() {
     while (!store_->contains_key(get_->key())) {
@@ -78,6 +79,13 @@ public:
 
   KVStoreServicer(size_t index, KVStore *store, Network *network)
       : index_(index), store_(store), network_(network) {}
+  ~KVStoreServicer() {
+    for (size_t i = 0; i < repliers.size(); i++) {
+      KVStoreReplier *replier = repliers.get(i);
+      replier->join();
+      delete replier;
+    }
+  }
 
   /** Begins the service thread. **/
   void run() {
@@ -85,10 +93,6 @@ public:
     while (true) {
       Message *msg = network_->receive_msg();
       switch (msg->kind()) {
-      case MsgKind::Kill:
-        delete msg;
-        return;
-        break;
       case MsgKind::Put:
         handle_put(dynamic_cast<Put *>(msg));
         break;
@@ -98,6 +102,9 @@ public:
       case MsgKind::Reply:
         handle_reply(dynamic_cast<Reply *>(msg));
         break;
+      case MsgKind::Kill:
+        delete msg;
+        return;
       case MsgKind::Status:
         break;
       case MsgKind::Register:
@@ -129,6 +136,7 @@ public:
     assert(put->target() == index_);
     assert(put->key()->node() == index_);
     store_->put(put->key(), put->value()->clone());
+    delete put;
   }
 
   /** Handles reception of a get message by replying back with the data of the
@@ -147,6 +155,7 @@ public:
     cur_value_ = reply->value()->clone();
     lock_.notify_all();
     lock_.unlock();
+    delete reply;
   }
 };
 
@@ -169,7 +178,7 @@ void KVStore::stop_service() {
 void KVStore::put(Key *key, Value *value) {
   if (key->node() == index_)
     return ConcurrentKVMap::put(key, value);
-  Message *put = new Put(key->clone(), value->clone());
+  Message *put = new Put(key->clone(), value);
   put->init(index_, key->node(), 0);
   network_->send_msg(put);
 }
