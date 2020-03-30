@@ -65,7 +65,8 @@ int main(int argc, char **argv) {
     }
     delete[] threads;
   } else {
-    assert(false);
+    Application *app = get_app(arg.index, network);
+    app->start();
   }
 
   delete network;

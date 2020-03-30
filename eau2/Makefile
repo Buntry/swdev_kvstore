@@ -33,8 +33,25 @@ pseudo: build
 triv: build
 	./a.out -pseudo -num_nodes 1 -app trivial
 
-# triv-net: build
-# 	./a.out -num_nodes 1 -index 0 -app trivial 
+triv-net: build
+	./a.out -num_nodes 1 -index 0 -ip 127.0.0.1 -port 8080 -app trivial 
 
 demo: build
 	./a.out -pseudo -num_nodes 3 -app demo
+
+# Still working on getting demo to work across a network-ip. We think there's a bug in our implementation of
+# network-ip.
+
+# demo-net1: build
+# 	./a.out -num_nodes 3 -index 0 -ip 127.0.0.1 -port 8080 -app demo
+
+# demo-net2:
+# 	./a.out -num_nodes 3 -index 1 -ip 127.0.0.2 -port 8080 -server_ip 127.0.0.1 -server_port 8080 -app demo
+
+# demo-net3:
+# 	./a.out -num_nodes 3 -index 2 -ip 127.0.0.3 -port 8080 -server_ip 127.0.0.1 -server_port 8080 -app demo
+
+test-net: build
+	./a.out -num_nodes 3 -index 0 -ip 127.0.0.1 -port 8080 -app test &
+	./a.out -num_nodes 3 -index 1 -ip 127.0.0.2 -port 8080 -server_ip 127.0.0.1 -server_port 8080 -app test &
+	./a.out -num_nodes 3 -index 2 -ip 127.0.0.3 -port 8080 -server_ip 127.0.0.1 -server_port 8080 -app test

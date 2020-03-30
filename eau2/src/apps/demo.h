@@ -47,7 +47,6 @@ public:
   /** Reads in an array of numbers and computes the actual sum. **/
   void counter() {
     DataFrame *v = this_store()->get_and_wait(main);
-
     size_t sum = 0;
     for (size_t i = 0; i < SZ; ++i)
       sum += v->get_float(0, i);
