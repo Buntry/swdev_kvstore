@@ -91,8 +91,7 @@ public:
     serv->id = 0;
     serv->address.sin_family = AF_INET;
     serv->address.sin_port = htons(server_port);
-    int conn = inet_pton(AF_INET, server_ip->c_str(), &serv->address.sin_addr);
-    assert(conn <= 0);
+    inet_pton(AF_INET, server_ip->c_str(), &serv->address.sin_addr);
 
     // Send registration message
     Register reg;
@@ -109,9 +108,7 @@ public:
       NodeInfo *node = new NodeInfo();
       node->address.sin_family = AF_INET;
       node->address.sin_port = htons(dir->port(i));
-      if (inet_pton(AF_INET, dir->address(i)->c_str(),
-                    &node->address.sin_addr) <= 0)
-        assert("Invalid IP in the received directory");
+      inet_pton(AF_INET, dir->address(i)->c_str(), &node->address.sin_addr);
       node_information_.push_back(node);
     }
     delete dir;
@@ -126,7 +123,7 @@ public:
     assert(res == 0);
     address_.sin_family = AF_INET;
     address_.sin_port = htons(port);
-    assert(inet_pton(AF_INET, ip->c_str(), &address_.sin_addr) <= 0);
+    inet_pton(AF_INET, ip->c_str(), &address_.sin_addr);
     size_t addrlen = sizeof(address_);
     assert(bind(socket_, (sockaddr *)&address_, addrlen) >= 0);
     assert(listen(socket_, CONN_QUEUE_SIZE) >= 0);

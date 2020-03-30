@@ -351,10 +351,11 @@ public:
     // Determine if we should grab this data from another node.
     Key *chunk_key = new Key(sb.get(), target);
     Value *val = (target == store_->index())
-                     ? store_->get_value(chunk_key)
+                     ? store_->get_value(chunk_key)->clone()
                      : store_->get_and_wait_value(chunk_key);
     Deserializer dser(*val->blob());
     delete chunk_key;
+    delete val;
     delete cols_.set(col, Column::deserialize(dser));
     dist_scm_->chunk_indexes_->set(col, desired_chunk);
     return true;
