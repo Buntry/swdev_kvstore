@@ -290,12 +290,14 @@ Message *Message::from(Deserializer &dser) {
   case MsgKind::Get:
     msg = new Get();
     break;
+  case MsgKind::Put:
+    msg = new Put();
+    break;
   case MsgKind::Reply:
     msg = new Reply();
     break;
   default:
-    msg = nullptr;
-    break;
+    assert(false);
   }
   msg->deserialize(dser);
   return msg;

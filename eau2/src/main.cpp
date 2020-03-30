@@ -67,6 +67,7 @@ int main(int argc, char **argv) {
   } else {
     Application *app = get_app(arg.index, network);
     app->start();
+    delete app;
   }
 
   delete network;
