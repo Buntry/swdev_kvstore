@@ -29,10 +29,10 @@ public:
   void start() {
     store_.start_service();
     run_();
+    store_.wait_to_close();
   }
 
-  /** Stops this application. **/
-  void stop() { store_.stop_service(); }
+  /** Halts the application successfully **/
   void stop_all() {
     for (size_t i = 0; i < arg.num_nodes; i++) {
       if (i == index_)
@@ -41,6 +41,6 @@ public:
       kill->init(index_, i, 0);
       network()->send_msg(kill);
     }
-    stop();
+    store_.stop_service();
   }
 };

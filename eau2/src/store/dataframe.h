@@ -406,6 +406,7 @@ public:
 
       StrBuff sb;
       sb.c(*key->key()).c("-column0-chunk").c(c);
+
       Key *chunk_key = new Key(sb.get(), (key->node() + c) % arg.num_nodes);
       kv->put(chunk_key, value);
       delete chunk_key;
@@ -437,6 +438,7 @@ public:
     sb.c(*key->key()).c("-column0-chunk0");
     Serializer fc_ser;
     fc.serialize(fc_ser);
+
     Key *chunk_key = new Key(sb.get(), key->node());
     kv->put(chunk_key, new Value(*fc_ser.data()));
     delete chunk_key;

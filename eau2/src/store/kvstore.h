@@ -170,6 +170,11 @@ void KVStore::stop_service() {
   Message *kill = new Kill();
   kill->init(index_, index_, 0);
   network_->send_msg(kill);
+}
+
+/** Waits on the servicer thread to close. This is done when the servicer
+ * receives a kill message. **/
+void KVStore::wait_to_close() {
   servicer_->join();
   delete servicer_;
 }
