@@ -16,7 +16,6 @@ public:
       return;
 
     if (this_node() == 0) {
-      Thread::sleep(200);
       Message *msg = new Status(new String("Telephone!"));
       msg->init(this_node(), target(), this_node());
       network()->send_msg(msg);

@@ -344,7 +344,7 @@ public:
     must_load_ = false;
 
     // Set up key parameters
-    StrBuff sb;
+    StrBuff sb; 
     sb.c(*key_->key()).c("-column").c(col).c("-chunk").c(desired_chunk);
     size_t target = (key_->node() + desired_chunk) % arg.num_nodes;
 

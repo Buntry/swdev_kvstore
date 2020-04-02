@@ -29,6 +29,7 @@ public:
   void start() {
     store_.start_service();
     run_();
+    // store_.wait_to_close();
   }
 
   /** Stops this application. **/
