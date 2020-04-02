@@ -20,7 +20,7 @@ run: build
 
 # Valgrind the mainfile
 valgr: build
-	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes -v ./a.out -pseudo -num_nodes 3 -app demo
+	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes -v ./a.out -pseudo -num_nodes 1 -app trivial
 
 # Cleans only the compiled binaries and datafiles
 clean:
@@ -51,8 +51,3 @@ demo-net2:
 
 demo-net3:
 	./a.out -num_nodes 3 -index 2 -ip 127.0.0.3 -port 8080 -server_ip 127.0.0.1 -server_port 8080 -app demo
-
-test-net: build
-	./a.out -num_nodes 3 -index 0 -ip 127.0.0.1 -port 8080 -app test &
-	./a.out -num_nodes 3 -index 1 -ip 127.0.0.2 -port 8080 -server_ip 127.0.0.1 -server_port 8080 -app test &
-	./a.out -num_nodes 3 -index 2 -ip 127.0.0.3 -port 8080 -server_ip 127.0.0.1 -server_port 8080 -app test

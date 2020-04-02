@@ -73,5 +73,5 @@ public:
   /** Starts/stops a thread that services incoming requests on the network. **/
   void start_service();
   void stop_service();
-  void delete_servicer();
+  void wait_to_close();
 };

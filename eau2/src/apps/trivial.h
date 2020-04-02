@@ -38,6 +38,6 @@ public:
     delete df;
     delete df2;
 
-    stop();
+    stop_all();
   }
 };
