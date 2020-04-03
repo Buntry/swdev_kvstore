@@ -27,6 +27,7 @@ public:
   bool pseudo_network = false;
   bool is_server = true;
   char *app = nullptr;
+  const char *file;
 
   void parse(int argc, char **argv) {
     for (int i = 1; i < argc; i++) {

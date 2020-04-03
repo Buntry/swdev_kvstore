@@ -2,6 +2,7 @@
 #pragma once
 
 #include "../utils/thread.h"
+#include "../utils/writer.h"
 #include "kvstore-fd.h"
 #include "rows.h"
 
@@ -444,6 +445,60 @@ public:
     delete chunk_key;
 
     // Also put the distributed schema value.
+    Serializer ser;
+    distributed_schema->serialize(ser);
+    kv->put(key, new Value(*ser.data()));
+
+    return df;
+  }
+
+  static DataFrame *fromVisitor(Key *key, KVStore *kv, const char *s,
+                                Writer *w) {
+    Schema *distributed_schema = new Schema(s);
+
+    Schema mt;
+    DataFrame *df = new DataFrame(mt, kv);
+
+    // Get the number of chunks to split the data into
+    size_t rem = w->end_ % CHUNK_SIZE;
+    size_t num_chunks = (w->end_ / CHUNK_SIZE) + 1;
+
+    for (size_t c = 0; c < num_chunks; c++) {
+      IntColumn ic;
+      size_t limit = (c == num_chunks - 1) ? rem : CHUNK_SIZE;
+      for (size_t i = 0; i < limit; i++) {
+        ic.push_back(w->buf_[c * CHUNK_SIZE + i]);
+        distributed_schema->add_row();
+      }
+
+      if (c == 0) {
+        df->add_column(&ic);
+      }
+
+      // Serialize and store this chunk of the column.
+      Serializer ser;
+      ic.serialize(ser);
+      Value *value = new Value(*ser.data());
+
+      StrBuff sb;
+      sb.c(*key->key()).c("-column0-chunk").c(c);
+
+      Key *chunk_key = new Key(sb.get(), (key->node() + c) % arg.num_nodes);
+      kv->put(chunk_key, value);
+      delete chunk_key;
+    }
+
+    Serializer ser;
+    distributed_schema->serialize(ser);
+    kv->put(key, new Value(*ser.data()));
+
+    // Let the df know about its true schema
+    df->set_distributed_schema_(key, distributed_schema);
+    return df;
+    Schema mt;
+
+    DataFrame *df = new DataFrame(mt, kv);
+
     Serializer ser;
     distributed_schema->serialize(ser);
     kv->put(key, new Value(*ser.data()));
