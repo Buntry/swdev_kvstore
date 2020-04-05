@@ -47,6 +47,10 @@ public:
     fillBuffer_();
     skipWhitespace_();
   }
+  ~FileReader() {
+    delete[] buf_;
+    fclose(file_);
+  }
 
   static const size_t BUFSIZE = 1024;
 
@@ -107,16 +111,20 @@ public:
 /***************************************************************************/
 class Summer : public Writer {
 public:
-  StringArray words_;
-  IntArray counts_;
+  StringArray *words_;
+  IntArray *counts_;
   size_t index_ = 0;
 
-  Summer(SIMap &map) : words_(*map.keys()), counts_(*map.values()) {}
+  Summer(SIMap &map) : words_(map.keys()), counts_(map.values()) {}
+  ~Summer() {
+    delete words_;
+    delete counts_;
+  }
 
   void next() { index_++; }
 
-  String *k() { return words_.get(index_); }
-  int v() { return counts_.get(index_); }
+  String *k() { return words_->get(index_); }
+  int v() { return counts_->get(index_); }
 
   bool accept(Row &r) {
     r.set(0, k()->clone());
@@ -125,7 +133,7 @@ public:
     return false;
   }
 
-  bool done() { return index_ >= words_.size(); }
+  bool done() { return index_ >= words_->size(); }
 };
 
 /****************************************************************************
@@ -147,12 +155,7 @@ public:
   void run_() override {
     if (this_node() == 0) {
       FileReader fr;
-      DataFrame *df = DataFrame::fromVisitor(&data, this_store(), "S", fr);
-
-      std::cout << "dataframe length (num words) " << df->dist_scm_->length()
-                << std::endl;
-
-      delete df;
+      delete DataFrame::fromVisitor(&data, this_store(), "S", fr);
     }
 
     local_count();
@@ -165,8 +168,9 @@ public:
 
   /** Returns a key for given node. **/
   Key *mk_key(size_t idx) {
-    KeyBuff kb(new Key("wc-map-", idx));
-    Key *k = kb.c(idx).get();
+    StrBuff sb;
+    sb.c("wc-map-").c(idx);
+    Key *k = new Key(sb.get(), idx);
     p("Created key ").pln(k->key()->c_str());
     return k;
   }
@@ -192,6 +196,7 @@ public:
       total += totals->get(i);
     }
     p("Node ").p(this_node()).p(" saw ").p(total).pln(" total words.");
+    delete totals;
   }
 
   /** Merge the data frames of all nodes */

@@ -4,7 +4,6 @@
 #include "../client/network.h"
 #include "../utils/map.h"
 #include "dataframe.h"
-#include "keybuff.h"
 
 /** Gets a distributed dataframe that is locally hosted on this KV store.  **/
 DataFrame *KVStore::get(Key *key) {

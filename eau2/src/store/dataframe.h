@@ -2,7 +2,6 @@
 #pragma once
 
 #include "../utils/thread.h"
-#include "keybuff.h"
 #include "kvstore-fd.h"
 #include "rows.h"
 
@@ -383,9 +382,9 @@ public:
   void local_load_(size_t chunk) {
     assert(is_distributed && is_locally_stored_(chunk));
     for (size_t col = 0; col < dist_scm_->width(); col++) {
-      KeyBuff kb(key_);
-      kb.c("-column").c(col).c("-chunk").c(chunk).set_node(store_->index());
-      Key *chunk_key = kb.get();
+      StrBuff sb;
+      sb.c(*key_->key()).c("-column").c(col).c("-chunk").c(chunk);
+      Key *chunk_key = new Key(sb.get(), store_->index());
 
       Value *v = store_->get_value(chunk_key);
       Deserializer dser(*v->blob());
@@ -402,9 +401,9 @@ public:
     size_t target = ((chunk + key_->node()) % arg.num_nodes);
 
     for (size_t col = 0; col < dist_scm_->width(); col++) {
-      KeyBuff kb(key_);
-      kb.c("-column").c(col).c("-chunk").c(chunk).set_node(target);
-      Key *chunk_key = kb.get();
+      StrBuff sb;
+      sb.c(*key_->key()).c("-column").c(col).c("-chunk").c(chunk);
+      Key *chunk_key = new Key(sb.get(), target);
 
       Value *val = store_->get_and_wait_value(chunk_key);
       Deserializer dser(*val->blob());
@@ -570,9 +569,9 @@ public:
       for (size_t col = 0; col < df->ncols(); col++) {
         // Build the key for the current column chunk
         size_t target = ((k->node() + cur_chunk) % arg.num_nodes);
-        KeyBuff kb(k);
-        kb.c("-column").c(col).c("-chunk").c(cur_chunk).set_node(target);
-        Key *chunk_key = kb.get();
+        StrBuff sb;
+        sb.c(*k->key()).c("-column").c(col).c("-chunk").c(cur_chunk);
+        Key *chunk_key = new Key(sb.get(), target);
 
         // Serialize the column into a value
         Serializer ser;
