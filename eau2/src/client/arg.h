@@ -27,7 +27,7 @@ public:
   bool pseudo_network = false;
   bool is_server = true;
   char *app = nullptr;
-  const char *file;
+  const char *file = nullptr;
 
   void parse(int argc, char **argv) {
     for (int i = 1; i < argc; i++) {
@@ -51,6 +51,8 @@ public:
         pseudo_network = true;
       } else if (eq_("-app", argv[i]) && i + 1 < argc) {
         app = argv[i + 1];
+      } else if (eq_("-file", argv[i]) && i + 1 < argc) {
+        file = argv[i + 1];
       }
     }
   }

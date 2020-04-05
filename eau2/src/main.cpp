@@ -1,5 +1,6 @@
 #include "apps/demo.h"
 #include "apps/trivial.h"
+#include "apps/wordcount.h"
 
 #include "client/application.h"
 #include "client/arg.h"
@@ -42,6 +43,8 @@ Application *get_app(size_t index, Network *network) {
     return new Trivial(index, network);
   } else if (strcmp(arg.app, "demo") == 0) {
     return new Demo(index, network);
+  } else if (strcmp(arg.app, "wc") == 0) {
+    return new WordCount(index, network);
   }
   assert(false);
 }

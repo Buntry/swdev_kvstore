@@ -386,12 +386,6 @@ public:
     }
   };
 
-  /** Pushes back, but steals the value. Used in deserialization **/
-  virtual void push_back_steal_(String *s) {
-    assert(s != nullptr);
-    vals_.push_back(s);
-  }
-
   /** Push back a dummy on missing **/
   void push_back_missing() {
     Column::push_back_missing();
@@ -436,7 +430,7 @@ public:
       if (missing.get(i)) {
         sc->push_back_missing();
       } else {
-        sc->push_back_steal_(String::deserialize(dser));
+        sc->push_back(String::deserialize(dser));
       }
     }
     return sc;

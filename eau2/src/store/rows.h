@@ -160,6 +160,19 @@ public:
 };
 
 /*******************************************************************************
+ *  Writer::
+ *  An interface for iterating through each row of a data frame, mutating each
+ *  row.
+ *
+ * @author griep.p@husky.neu.edu & colabella.a@husky.neu.edu
+ */
+class Writer : public Rower {
+public:
+  // Determines whether this writer is finished writing.
+  virtual bool done() { return true; }
+};
+
+/*******************************************************************************
  * PrintFielder::
  *
  * Prints fields in SoR format without new lines.
