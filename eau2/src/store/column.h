@@ -386,9 +386,10 @@ public:
     }
   };
 
-  /** Pushes back, but steals the value. Used in deserialization **/
-  virtual void push_back_steal_(String *s) {
+  /** Steals this string on push back, only used for deserialization. **/
+  void push_back_steal_(String *s) {
     assert(s != nullptr);
+    missing_.push_back(false);
     vals_.push_back(s);
   }
 

@@ -2,7 +2,6 @@
 #pragma once
 
 #include "../utils/thread.h"
-#include "../utils/writer.h"
 #include "kvstore-fd.h"
 #include "rows.h"
 
@@ -150,12 +149,12 @@ public:
    */
   void fill_row(size_t idx, Row &row) {
     row.set_idx(idx);
+
     for (size_t i = 0; i < ncols(); i++) {
       if (is_missing(i, idx)) {
         row.set_missing(i);
         continue;
       }
-
       switch (scm_->col_type(i)) {
       case 'B':
         row.set(i, local_get_bool(i, idx));
@@ -209,6 +208,7 @@ public:
 
   /** Visit rows in order */
   void map(Rower &r) {
+    assert(!is_distributed);
     Row row(*scm_);
     for (size_t i = 0; i < nrows(); i++) {
       fill_row(i, row);
@@ -239,6 +239,7 @@ public:
   /** This method clones the Rower and executes the map in parallel. Join is
    * used at the end to merge the results. */
   void pmap(Rower &r) {
+    assert(!is_distributed);
     // Default to one thread.
     size_t num_threads = 1;
     size_t rows_per_thread = (nrows() / num_threads) + 1;
@@ -362,6 +363,105 @@ public:
     return true;
   }
 
+  /** Determines if the chunk is locally stored on this node. **/
+  bool is_locally_stored_(size_t chunk) {
+    return ((chunk + key_->node()) % arg.num_nodes) == store_->index();
+  }
+
+  /** Loads data from a chunk into this dataframe. **/
+  void load_(size_t chunk) {
+    assert(is_distributed);
+    if (is_locally_stored_(chunk)) {
+      local_load_(chunk);
+    } else {
+      nonlocal_load_(chunk);
+    }
+  }
+
+  /** Locally loads data from this keyvalue store. **/
+  void local_load_(size_t chunk) {
+    assert(is_distributed && is_locally_stored_(chunk));
+    for (size_t col = 0; col < dist_scm_->width(); col++) {
+      StrBuff sb;
+      sb.c(*key_->key()).c("-column").c(col).c("-chunk").c(chunk);
+      Key *chunk_key = new Key(sb.get(), store_->index());
+
+      Value *v = store_->get_value(chunk_key);
+      Deserializer dser(*v->blob());
+      delete cols_.set(col, Column::deserialize(dser));
+
+      delete chunk_key;
+      dist_scm_->chunk_indexes_->set(col, chunk);
+    }
+  }
+
+  /** Non-locally loads data from the desired key value store. **/
+  void nonlocal_load_(size_t chunk) {
+    assert(is_distributed && !is_locally_stored_(chunk));
+    size_t target = ((chunk + key_->node()) % arg.num_nodes);
+
+    for (size_t col = 0; col < dist_scm_->width(); col++) {
+      StrBuff sb;
+      sb.c(*key_->key()).c("-column").c(col).c("-chunk").c(chunk);
+      Key *chunk_key = new Key(sb.get(), target);
+
+      Value *val = store_->get_and_wait_value(chunk_key);
+      Deserializer dser(*val->blob());
+      delete cols_.set(col, Column::deserialize(dser));
+      delete val;
+      delete chunk_key;
+      dist_scm_->chunk_indexes_->set(col, chunk);
+    }
+  }
+
+  /** Performs a map operation on only the local data **/
+  void local_map(Rower &rower) {
+    assert(is_distributed);
+
+    size_t MAX_ROWS = dist_scm_->length();
+    size_t NUM_CHUNKS = MAX_ROWS / CHUNK_SIZE;
+    size_t MAX_CHUNKS =
+        (MAX_ROWS % CHUNK_SIZE == 0) ? NUM_CHUNKS : NUM_CHUNKS + 1;
+    Row row(get_schema());
+    for (size_t cur_chunk = 0; cur_chunk < MAX_CHUNKS; cur_chunk++) {
+      // Check to see if the chunk is stored locally
+      if (!is_locally_stored_(cur_chunk))
+        continue;
+      load_(cur_chunk);
+
+      size_t end_of_chunk = (cur_chunk + 1) * CHUNK_SIZE;
+      size_t limit = Util::min(end_of_chunk, dist_scm_->length());
+      for (size_t idx = cur_chunk * CHUNK_SIZE; idx < limit; idx++) {
+        fill_row(idx % CHUNK_SIZE, row);
+        row.set_idx(idx);
+        rower.accept(row);
+      }
+    }
+  }
+
+  /** Performs a map operation on the entire distributed dataframe. **/
+  void distributed_map(Rower &rower) {
+    assert(is_distributed);
+
+    size_t MAX_ROWS = dist_scm_->length();
+    size_t NUM_CHUNKS = MAX_ROWS / CHUNK_SIZE;
+    size_t MAX_CHUNKS =
+        (MAX_ROWS % CHUNK_SIZE == 0) ? NUM_CHUNKS : NUM_CHUNKS + 1;
+    Row row(get_schema());
+    for (size_t cur_chunk = 0; cur_chunk < MAX_CHUNKS; cur_chunk++) {
+      load_(cur_chunk);
+
+      size_t end_of_chunk = (cur_chunk + 1) * CHUNK_SIZE;
+      size_t limit = Util::min(end_of_chunk, dist_scm_->length());
+
+      for (size_t idx = cur_chunk * CHUNK_SIZE; idx < limit; idx++) {
+        fill_row(idx % CHUNK_SIZE, row);
+        row.set_idx(idx);
+        rower.accept(row);
+      }
+    }
+  }
+
   /** Normalizes a row index to the current chunk offset for that column. **/
   size_t normalize_(size_t col, size_t row) {
     return row - (chunk_offset_(col) * CHUNK_SIZE);
@@ -452,56 +552,45 @@ public:
     return df;
   }
 
-  static DataFrame *fromVisitor(Key *key, KVStore *kv, const char *s,
-                                Writer *w) {
-    Schema *distributed_schema = new Schema(s);
+  /** Distributes a dataframe across the network according to a protocol.  **/
+  static DataFrame *fromVisitor(Key *k, KVStore *kv, const char *s, Writer &w) {
+    Schema scm(s);
+    Schema *distributed_schema = new Schema(scm);
 
-    Schema mt;
-    DataFrame *df = new DataFrame(mt, kv);
-
-    // Get the number of chunks to split the data into
-    size_t rem = w->end_ % CHUNK_SIZE;
-    size_t num_chunks = (w->end_ / CHUNK_SIZE) + 1;
-
-    for (size_t c = 0; c < num_chunks; c++) {
-      IntColumn ic;
-      size_t limit = (c == num_chunks - 1) ? rem : CHUNK_SIZE;
-      for (size_t i = 0; i < limit; i++) {
-        ic.push_back(w->buf_[c * CHUNK_SIZE + i]);
+    DataFrame *df = new DataFrame(scm, kv);
+    Row row(scm);
+    for (size_t cur_chunk = 0; !w.done(); cur_chunk++) {
+      for (size_t i = 0; i < CHUNK_SIZE && !w.done(); i++) {
+        w.accept(row);
+        df->add_row(row);
         distributed_schema->add_row();
       }
 
-      if (c == 0) {
-        df->add_column(&ic);
+      for (size_t col = 0; col < df->ncols(); col++) {
+        // Build the key for the current column chunk
+        size_t target = ((k->node() + cur_chunk) % arg.num_nodes);
+        StrBuff sb;
+        sb.c(*k->key()).c("-column").c(col).c("-chunk").c(cur_chunk);
+        Key *chunk_key = new Key(sb.get(), target);
+
+        // Serialize the column into a value
+        Serializer ser;
+        ser.write(df->cols_.get(col));
+        kv->put(chunk_key, new Value(*ser.data()));
+
+        delete chunk_key;
       }
 
-      // Serialize and store this chunk of the column.
-      Serializer ser;
-      ic.serialize(ser);
-      Value *value = new Value(*ser.data());
-
-      StrBuff sb;
-      sb.c(*key->key()).c("-column0-chunk").c(c);
-
-      Key *chunk_key = new Key(sb.get(), (key->node() + c) % arg.num_nodes);
-      kv->put(chunk_key, value);
-      delete chunk_key;
+      delete df;
+      df = new DataFrame(scm, kv);
     }
 
     Serializer ser;
     distributed_schema->serialize(ser);
-    kv->put(key, new Value(*ser.data()));
+    kv->put(k, new Value(*ser.data()));
 
-    // Let the df know about its true schema
-    df->set_distributed_schema_(key, distributed_schema);
-    return df;
-    Schema mt;
-
-    DataFrame *df = new DataFrame(mt, kv);
-
-    Serializer ser;
-    distributed_schema->serialize(ser);
-    kv->put(key, new Value(*ser.data()));
+    df->set_distributed_schema_(k, distributed_schema);
+    df->must_load_on_next_query_();
 
     return df;
   }

@@ -147,20 +147,11 @@ DataFrame* new_df = df.filter(oe); // Will get only rows with even indices.
 
 #### Open questions
 
-We currently are struggling with our network implementation and are looking
-to have a one-on-one with a professor to figure out how to increase the robusticity
-of our solution.
-
-Our network-pseudo code works for any application we throw at it, but the network-ip
-implementation still stumps us. We're looking for a time and place to find someone who
-can fix these issues.
-
-We're also looking for a way to restructure the KVStore threads (we're currently using 2-layers of threads).
+We are looking for a way to restructure the KVStore threads (we're currently using 2-layers of threads).
 We have a Servicer and within that a Replier. I want to have a dialogue with a professor about how to
 refactor our KV implementation.
 
 #### Status
 
-We spent this week catching up and basically completing milestones 2 and 3 at the same time. We are
-certainly not happy with the current state of kvstore.h, but we do like our protocol for distributing
-data.
+We spent this week finishing up milestone 4. Our networkIP implementation is fixed and our valgrind results show
+no leaks, even for M4!

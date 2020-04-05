@@ -7,7 +7,11 @@
 
 /** Gets a distributed dataframe that is locally hosted on this KV store.  **/
 DataFrame *KVStore::get(Key *key) {
-  assert(key->node() == index_ && contains_key(key));
+  assert(key->node() == index_);
+  if (!contains_key(key)) {
+    p("Store # ").p(index_).p(" doesn't have key ").pln(key->key()->c_str());
+  }
+  assert(contains_key(key));
 
   // Load data from local storage.
   Value *from = KVMap::get(key);

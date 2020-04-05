@@ -143,6 +143,9 @@ static const float MIN_LOAD_FACTOR = 0.6;
 /** Generates a Mapping from Object to Object **/
 generate_classmap(Map, MapNode, Array, Array, Object *, Object *);
 
+/** Represents a Mapping from String* to int **/
+generate_classmap(SIMap, SINode, StringArray, IntArray, String *, int);
+
 #define generate_object_classmap(KlassMap, KlassArray, Klass)                  \
   class KlassMap : public Map {                                                \
   public:                                                                      \
