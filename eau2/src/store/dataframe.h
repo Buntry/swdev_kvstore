@@ -201,10 +201,14 @@ public:
   }
 
   /** The number of rows in the dataframe. */
-  size_t nrows() { is_distributed_ ? dist_scm_->length() : scm_->length(); }
+  size_t nrows() {
+    return is_distributed_ ? dist_scm_->length() : scm_->length();
+  }
 
   /** The number of columns in the dataframe.*/
-  size_t ncols() { is_distributed_ ? dist_scm_->width() : scm_->width(); }
+  size_t ncols() {
+    return is_distributed_ ? dist_scm_->width() : scm_->width();
+  }
 
   /** Visit rows in order */
   void map(Rower &r) {
@@ -553,7 +557,7 @@ public:
   }
 
   /** Stores a 1-by-1 dataframe at the given node in the KVStore. **/
-  static DataFrame *fromScalar(Key *key, KVStore *kv, int value) {
+  static DataFrame *fromScalarI(Key *key, KVStore *kv, int value) {
     Schema *distributed_schema = new Schema("F");
 
     IntColumn ic(1, value);

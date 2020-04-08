@@ -180,9 +180,9 @@ class Linus : public Application {
 public:
   int DEGREES = 4;  // How many degrees of separation form linus?
   int LINUS = 4967; // The uid of Linus (offset in the user df)
-  const char *PROJ = "datasets/projects.ltgt";
-  const char *USER = "datasets/users.ltgt";
-  const char *COMM = "datasets/commits.ltgt";
+  const char *PROJ = "data/projects.ltgt";
+  const char *USER = "data/users.ltgt";
+  const char *COMM = "data/commits.ltgt";
   DataFrame *projects; //  pid x project name
   DataFrame *users;    // uid x user name
   DataFrame *commits;  // pid x uid x uid
@@ -191,7 +191,7 @@ public:
 
   Linus(size_t idx, Network *net) : Application(idx, net) {}
 
-  /** Compute DEGREES of Linus.  */
+  /** Compute DEGREES of Linus. */
   void run_() override {
     readInput();
     for (size_t i = 0; i < DEGREES; i++)
@@ -217,7 +217,7 @@ public:
       commits = DataFrame::fromFile(COMM, &cK, this_store());
       p("    ").p(commits->nrows()).pln(" commits");
       // This dataframe contains the id of Linus.
-      delete DataFrame::fromScalar(new Key("users-0-0"), this_store(), LINUS);
+      delete DataFrame::fromScalarI(new Key("users-0-0"), this_store(), LINUS);
     } else {
       projects = this_store()->get_and_wait(&pK);
       users = this_store()->get_and_wait(&uK);
@@ -238,7 +238,7 @@ public:
     DataFrame *newUsers = this_store()->get_and_wait(&uK);
     Set delta(users);
     SetUpdater upd(delta);
-    newUsers->map(upd); // all of the new users are copied to delta.
+    newUsers->distributed_map(upd); // all of the new users are copied to delta.
     delete newUsers;
     ProjectsTagger ptagger(delta, *pSet, projects);
     commits->local_map(ptagger); // marking all projects touched by delta
@@ -263,13 +263,13 @@ public:
     if (this_node() == 0) {
       for (size_t i = 1; i < arg.num_nodes; ++i) {
         Key nK(StrBuff(name).c(stage).c("-").c(i).get());
-        DataFrame *delta = dynamic_cast<DataFrame *>(kv.waitAndGet(nK));
+        DataFrame *delta = this_store()->get_and_wait(&nK);
         p("    received delta of ")
             .p(delta->nrows())
             .p(" elements from node ")
             .pln(i);
         SetUpdater upd(set);
-        delta->map(upd);
+        delta->distributed_map(upd);
         delete delta;
       }
       p("    storing ").p(set.size()).pln(" merged elements");
@@ -285,7 +285,7 @@ public:
       DataFrame *merged = this_store()->get_and_wait(&mK);
       p("    receiving ").p(merged->nrows()).pln(" merged elements");
       SetUpdater upd(set);
-      merged->map(upd);
+      merged->distributed_map(upd);
       delete merged;
     }
   }
