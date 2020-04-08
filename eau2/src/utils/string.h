@@ -113,6 +113,9 @@ public:
     val_ = new char[capacity_ = 10];
     size_ = 0;
   }
+
+  StrBuff(const char *str) : StrBuff() { c(str); }
+
   void grow_by_(size_t step) {
     if (step + size_ < capacity_)
       return;

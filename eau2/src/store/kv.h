@@ -12,6 +12,8 @@ public:
   /** Various ways to construct a Key **/
   Key(String &key, size_t node) : key_(key.clone()), node_(node) {}
   Key(String *key, size_t node) : key_(key), node_(node) {}
+  Key(String *key) : key_(key), node_(0) {}
+  Key(const char *key) : key_(new String(key)), node_(0) {}
   Key(const char *key, size_t node) : key_(new String(key)), node_(node) {}
   Key(Key &k) : key_(k.key_->clone()), node_(k.node_) {}
   ~Key() { delete key_; }

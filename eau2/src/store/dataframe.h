@@ -201,14 +201,14 @@ public:
   }
 
   /** The number of rows in the dataframe. */
-  size_t nrows() { return scm_->length(); }
+  size_t nrows() { is_distributed_ ? dist_scm_->length() : scm_->length(); }
 
   /** The number of columns in the dataframe.*/
-  size_t ncols() { return scm_->width(); }
+  size_t ncols() { is_distributed_ ? dist_scm_->width() : scm_->width(); }
 
   /** Visit rows in order */
   void map(Rower &r) {
-    assert(!is_distributed);
+    assert(!is_distributed_);
     Row row(*scm_);
     for (size_t i = 0; i < nrows(); i++) {
       fill_row(i, row);
@@ -239,7 +239,7 @@ public:
   /** This method clones the Rower and executes the map in parallel. Join is
    * used at the end to merge the results. */
   void pmap(Rower &r) {
-    assert(!is_distributed);
+    assert(!is_distributed_);
     // Default to one thread.
     size_t num_threads = 1;
     size_t rows_per_thread = (nrows() / num_threads) + 1;
@@ -316,7 +316,7 @@ public:
   KVStore *store_ = nullptr;
   Key *key_ = nullptr;
   Schema *dist_scm_ = nullptr;
-  bool is_distributed = false;
+  bool is_distributed_ = false;
   bool must_load_ = false;
 
   /** Adds a distributed schema to this DataFrame, consuming the schema. This
@@ -325,7 +325,7 @@ public:
   void set_distributed_schema_(Key *key, Schema *distributed_schema) {
     key_ = key->clone();
     dist_scm_ = distributed_schema;
-    is_distributed = true;
+    is_distributed_ = true;
   }
 
   /** Enforces that the **/
@@ -337,7 +337,7 @@ public:
   /** Loads data if it is not currently stored in local storage. Returns whether
    * or not the data loaded. **/
   bool load_if_necessary_(size_t col, size_t row) {
-    if (!is_distributed)
+    if (!is_distributed_)
       return false;
     size_t desired_chunk = row / CHUNK_SIZE;
     if (!must_load_ && chunk_offset_(col) == desired_chunk) {
@@ -370,7 +370,7 @@ public:
 
   /** Loads data from a chunk into this dataframe. **/
   void load_(size_t chunk) {
-    assert(is_distributed);
+    assert(is_distributed_);
     if (is_locally_stored_(chunk)) {
       local_load_(chunk);
     } else {
@@ -380,7 +380,7 @@ public:
 
   /** Locally loads data from this keyvalue store. **/
   void local_load_(size_t chunk) {
-    assert(is_distributed && is_locally_stored_(chunk));
+    assert(is_distributed_ && is_locally_stored_(chunk));
     for (size_t col = 0; col < dist_scm_->width(); col++) {
       StrBuff sb;
       sb.c(*key_->key()).c("-column").c(col).c("-chunk").c(chunk);
@@ -397,7 +397,7 @@ public:
 
   /** Non-locally loads data from the desired key value store. **/
   void nonlocal_load_(size_t chunk) {
-    assert(is_distributed && !is_locally_stored_(chunk));
+    assert(is_distributed_ && !is_locally_stored_(chunk));
     size_t target = ((chunk + key_->node()) % arg.num_nodes);
 
     for (size_t col = 0; col < dist_scm_->width(); col++) {
@@ -416,7 +416,7 @@ public:
 
   /** Performs a map operation on only the local data **/
   void local_map(Rower &rower) {
-    assert(is_distributed);
+    assert(is_distributed_);
 
     size_t MAX_ROWS = dist_scm_->length();
     size_t NUM_CHUNKS = MAX_ROWS / CHUNK_SIZE;
@@ -441,7 +441,7 @@ public:
 
   /** Performs a map operation on the entire distributed dataframe. **/
   void distributed_map(Rower &rower) {
-    assert(is_distributed);
+    assert(is_distributed_);
 
     size_t MAX_ROWS = dist_scm_->length();
     size_t NUM_CHUNKS = MAX_ROWS / CHUNK_SIZE;
@@ -552,7 +552,37 @@ public:
     return df;
   }
 
-  /** Distributes a dataframe across the network according to a protocol.  **/
+  /** Stores a 1-by-1 dataframe at the given node in the KVStore. **/
+  static DataFrame *fromScalar(Key *key, KVStore *kv, int value) {
+    Schema *distributed_schema = new Schema("F");
+
+    IntColumn ic(1, value);
+    distributed_schema->add_row();
+    Schema mt;
+
+    DataFrame *df = new DataFrame(mt, kv);
+    df->add_column(&ic);
+    df->set_distributed_schema_(key, distributed_schema);
+
+    // Add the chunk with one value.
+    StrBuff sb;
+    sb.c(*key->key()).c("-column0-chunk0");
+    Serializer ic_ser;
+    ic.serialize(ic_ser);
+
+    Key *chunk_key = new Key(sb.get(), key->node());
+    kv->put(chunk_key, new Value(*ic_ser.data()));
+    delete chunk_key;
+
+    // Also put the distributed schema value.
+    Serializer ser;
+    distributed_schema->serialize(ser);
+    kv->put(key, new Value(*ser.data()));
+
+    return df;
+  }
+
+  /** Distributes a dataframe across the network from a writer.  **/
   static DataFrame *fromVisitor(Key *k, KVStore *kv, const char *s, Writer &w) {
     Schema scm(s);
     Schema *distributed_schema = new Schema(scm);
@@ -593,6 +623,12 @@ public:
     df->must_load_on_next_query_();
 
     return df;
+  }
+
+  /** Distributes a dataframe across the network from a sorer file.  **/
+  static DataFrame *fromFile(const char *filename, Key *k, KVStore *kv) {
+    // TODO:
+    return nullptr;
   }
 };
 
