@@ -3,6 +3,7 @@
 
 #include "../utils/thread.h"
 #include "kvstore-fd.h"
+#include "parser.h"
 #include "rows.h"
 
 /** Static variable for number of rows before we consider multi-threading. **/
@@ -631,8 +632,9 @@ public:
 
   /** Distributes a dataframe across the network from a sorer file.  **/
   static DataFrame *fromFile(const char *filename, Key *k, KVStore *kv) {
-    // TODO:
-    return nullptr;
+    SorWriter sw(filename);
+    const char *schema = sw.get_schema();
+    return DataFrame::fromVisitor(k, kv, schema, sw);
   }
 };
 
