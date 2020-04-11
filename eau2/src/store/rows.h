@@ -21,6 +21,7 @@ public:
   virtual void accept(float f) {}
   virtual void accept(int i) {}
   virtual void accept(String *s) {}
+  virtual void accept() {}
 
   /** Called when all fields have been seen. */
   virtual void done() {}
@@ -96,6 +97,7 @@ public:
   bool get_bool(size_t col) { return cols_.get(col)->as_bool()->get(0); }
   float get_float(size_t col) { return cols_.get(col)->as_float()->get(0); }
   String *get_string(size_t col) { return cols_.get(col)->as_string()->get(0); }
+  bool get_missing(size_t col) { return cols_.get(col)->is_missing(0); }
 
   /** Number of fields in the row. */
   size_t width() { return scm_->width(); }
@@ -187,6 +189,7 @@ public:
   void accept(String *s) {
     p("<\"").p((s == nullptr) ? "" : s->c_str()).p("\">");
   }
+  void accept() { p("<>"); };
 
   /** Once we're done with the file, print a new line. **/
   void done() { pln(); }

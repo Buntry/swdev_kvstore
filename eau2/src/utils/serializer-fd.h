@@ -32,6 +32,7 @@ public:
   char *get_chunk(size_t index);
   CharArray *data();
   size_t length();
+  CharArray *steal();
 };
 
 /** Represents a Deserializer that can read from serialized data.

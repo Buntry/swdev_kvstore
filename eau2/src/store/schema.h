@@ -67,6 +67,9 @@ public:
     width_++;
   }
 
+  /** Returns a read-only version of the schema's type array **/
+  CharArray *types() { return types_; }
+
   /** Add a row with a name (possibly nullptr), name is external.  Names
    * are expectd to be unique, duplicates result in undefined behavior. */
   void add_row() { height_++; }
@@ -119,5 +122,15 @@ public:
       schema->types_->push_back(dser.read_char());
     }
     return schema;
+  }
+
+  /** Converts this schema back to a c-str representation. **/
+  char *c_str() {
+    char *res = new char[width() + 1];
+    res[width()] = '\0';
+    for (size_t i = 0; i < width(); i++) {
+      res[i] = col_type(i);
+    }
+    return res;
   }
 };

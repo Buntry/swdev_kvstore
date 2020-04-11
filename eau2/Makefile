@@ -44,6 +44,10 @@ demo: build
 wc: build
 	./a.out -pseudo -num_nodes 3 -app wc -file "./data/100k.txt"
 
+# Milestone 5
+linus: build
+	./a.out -pseudo -num_nodes 8 -app linus
+
 # Milestone 3 example on a network.
 demo-net1: build
 	./a.out -num_nodes 3 -index 0 -ip 127.0.0.1 -port 8080 -app demo
@@ -63,3 +67,5 @@ wc-net2:
 
 wc-net3:
 	./a.out -num_nodes 3 -index 2 -ip 127.0.0.3 -port 8080 -server_ip 127.0.0.1 -server_port 8080 -app wc -file "./data/100k.txt"
+
+

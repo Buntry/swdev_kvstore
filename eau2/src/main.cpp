@@ -1,4 +1,5 @@
 #include "apps/demo.h"
+#include "apps/linus.h"
 #include "apps/trivial.h"
 #include "apps/wordcount.h"
 
@@ -45,6 +46,8 @@ Application *get_app(size_t index, Network *network) {
     return new Demo(index, network);
   } else if (strcmp(arg.app, "wc") == 0) {
     return new WordCount(index, network);
+  } else if (strcmp(arg.app, "linus") == 0) {
+    return new Linus(index, network);
   }
   assert(false);
 }

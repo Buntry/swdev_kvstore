@@ -12,6 +12,8 @@ public:
   /** Various ways to construct a Key **/
   Key(String &key, size_t node) : key_(key.clone()), node_(node) {}
   Key(String *key, size_t node) : key_(key), node_(node) {}
+  Key(String *key) : key_(key), node_(0) {}
+  Key(const char *key) : key_(new String(key)), node_(0) {}
   Key(const char *key, size_t node) : key_(new String(key)), node_(node) {}
   Key(Key &k) : key_(k.key_->clone()), node_(k.node_) {}
   ~Key() { delete key_; }
@@ -54,10 +56,16 @@ public:
   Value(Deserializer &dser) : blob_(dser.data()->clone()) {}
   ~Value() { delete blob_; }
 
-  /** Returns the blob of data. **/
   CharArray *blob() { return blob_; }
   size_t size() { return blob_->size(); }
-  Value *clone() { return new Value(*blob()); }
+  Value *clone() { return new Value(*blob_); }
+
+  /** Steals a character array from this value. Must be deleted after **/
+  CharArray *steal() {
+    CharArray *give = blob_;
+    blob_ = nullptr;
+    return give;
+  }
 
   /** Serializes a value into a serializer. **/
   void serialize(Serializer &ser) {

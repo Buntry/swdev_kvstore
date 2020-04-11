@@ -64,6 +64,13 @@ void Serializer::write(char *arr, size_t len) {
 CharArray *Serializer::data() { return data_; }
 size_t Serializer::length() { return data_->size(); }
 
+/** Steals data from the serializer **/
+CharArray *Serializer::steal() {
+  CharArray *data = data_;
+  data_ = nullptr;
+  return data;
+}
+
 /** Gets the internal details and chunks of the serializer.
  * (Warning) this uses field-of-field and is poorly designed. **/
 size_t Serializer::num_chunks() { return data_->num_chunks_; }

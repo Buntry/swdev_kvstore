@@ -93,7 +93,10 @@ public:
   bool get(size_t idx) { return vals_.get(idx); }
   BoolColumn *as_bool() { return this; }
   /** Set value at idx. An out of bound idx is undefined.  */
-  void set(size_t idx, bool val) { vals_.set(idx, val); }
+  void set(size_t idx, bool val) {
+    vals_.set(idx, val);
+    missing_.set(idx, false);
+  }
   size_t size() { return vals_.size(); }
   void push_back(bool val) {
     missing_.push_back(false);
@@ -178,7 +181,10 @@ public:
   int get(size_t idx) { return vals_.get(idx); }
   IntColumn *as_int() { return this; }
   /** Set value at idx. An out of bound idx is undefined.  */
-  void set(size_t idx, int val) { vals_.set(idx, val); }
+  void set(size_t idx, int val) {
+    vals_.set(idx, val);
+    missing_.set(idx, false);
+  }
   size_t size() { return vals_.size(); }
   void push_back(int val) {
     missing_.push_back(false);
@@ -264,7 +270,10 @@ public:
   float get(size_t idx) { return vals_.get(idx); }
   FloatColumn *as_float() { return this; }
   /** Set value at idx. An out of bound idx is undefined.  */
-  void set(size_t idx, float val) { vals_.set(idx, val); }
+  void set(size_t idx, float val) {
+    vals_.set(idx, val);
+    missing_.set(idx, false);
+  }
   size_t size() { return vals_.size(); }
   void push_back(float val) {
     missing_.push_back(false);
