@@ -93,19 +93,20 @@ public:
  ****************************************************************************/
 class SetWriter : public Writer {
 public:
-  Set &set_;  // set to read from
-  int i_ = 0; // position in set
+  Set &set_;      // set to read from
+  size_t id_ = 0; // position in set
 
   SetWriter(Set &set) : set_(set) {}
 
-  /** Skip over false values and stop when the entire set has been seen */
+  /** Stop when the entire set has been seen */
   bool done() {
-    while ((size_t)i_ < set_.size_ && set_.test(i_) == false)
-      ++i_;
-    return (size_t)i_ == set_.size_;
+    while (id_ < set_.size_ && set_.test(id_) == false)
+      id_++;
+    return id_ >= set_.size();
   }
 
-  void visit(Row &row) { row.set(0, i_++); }
+  /** Writes the next truthy idx **/
+  bool accept(Row &row) { row.set(0, (int)id_++); }
 };
 
 /***************************************************************************
@@ -139,6 +140,91 @@ public:
         newProjects.set(pid);
       }
     return false;
+  }
+};
+
+generate_classmap(IDSet, IntToBool, IntArray, BoolArray, int, bool);
+
+/** Union to put all of a into b **/
+void combine_into_right(IDSet &a, IDSet &b) {
+  IntArray *a_ids = a.keys();
+  for (size_t i = 0; i < a_ids->size(); i++)
+    b.put(a_ids->get(i), true);
+  delete a_ids;
+}
+
+class IDSetWriter : public Writer {
+public:
+  IntArray *ids_;
+  size_t idx_ = 0;
+
+  IDSetWriter(IDSet &set) { ids_ = set.keys(); }
+  ~IDSetWriter() { delete ids_; }
+
+  bool done() { return idx_ >= ids_->size(); }
+  bool accept(Row &row) {
+    row.set(0, ids_->get(idx_++));
+    return true;
+  }
+};
+
+class IDSetUpdater : public Rower {
+public:
+  IDSet &set_;
+  IDSetUpdater(IDSet &set) : set_(set) {}
+
+  /** Assume a row with at least one column of type I. Assumes that there
+   * are no missing. Reads the value and sets the corresponding position.
+   * The return value is irrelevant here. */
+  bool accept(Row &row) {
+    set_.put(row.get_int(0), true);
+    return true;
+  }
+};
+
+class IDProjectsTagger : public Rower {
+public:
+  IDSet &uSet_;      // set of collaborator
+  IDSet &pSet_;      // set of projects of collaborators
+  IDSet newProjects; // newly tagged collaborator projects
+
+  IDProjectsTagger(IDSet &uSet, IDSet &pSet) : uSet_(uSet), pSet_(pSet) {}
+
+  /** The data frame must have at least two integer columns. The newProject
+   * set keeps track of projects that were newly tagged (they will have to
+   * be communicated to other nodes). */
+  bool accept(Row &row) {
+    int pid = row.get_int(0);
+    int uid = row.get_int(1);
+    if (uSet_.contains_key(uid))
+      if (!pSet_.contains_key(pid)) {
+        pSet_.put(pid, true);
+        newProjects.put(pid, true);
+      }
+    return true;
+  }
+};
+
+class IDUsersTagger : public Rower {
+public:
+  IDSet &pSet_;   // set of projects of collaborators
+  IDSet &uSet_;   // set of collaborator
+  IDSet newUsers; // newly tagged collaborator projects
+
+  IDUsersTagger(IDSet &pSet, IDSet &uSet) : pSet_(pSet), uSet_(uSet) {}
+
+  /** The data frame must have at least two integer columns. The newProject
+   * set keeps track of projects that were newly tagged (they will have to
+   * be communicated to other nodes). */
+  bool accept(Row &row) {
+    int pid = row.get_int(0);
+    int uid = row.get_int(1);
+    if (pSet_.contains_key(pid))
+      if (!uSet_.contains_key(uid)) {
+        uSet_.put(uid, true);
+        newUsers.put(uid, true);
+      }
+    return true;
   }
 };
 
@@ -186,8 +272,8 @@ public:
   DataFrame *projects; //  pid x project name
   DataFrame *users;    // uid x user name
   DataFrame *commits;  // pid x uid x uid
-  Set *uSet;           // Linus' collaborators
-  Set *pSet;           // projects of collaborators
+  IDSet uSet;          // Linus' collaborators
+  IDSet pSet;          // projects of collaborators
 
   Linus(size_t idx, Network *net) : Application(idx, net) {}
 
@@ -196,6 +282,10 @@ public:
     readInput();
     for (size_t i = 0; i < DEGREES; i++)
       step(i);
+
+    if (this_node() == 0) {
+      stop_all();
+    }
   }
 
   /** Node 0 reads three files, cointainng projects, users and commits, and
@@ -223,8 +313,6 @@ public:
       users = this_store()->get_and_wait(&uK);
       commits = this_store()->get_and_wait(&cK);
     }
-    uSet = new Set(users);
-    pSet = new Set(projects);
   }
 
   /** Performs a step of the linus calculation. It operates over the three
@@ -236,21 +324,23 @@ public:
     Key uK(StrBuff("users-").c(stage).c("-0").get());
     // A df with all the users added on the previous round
     DataFrame *newUsers = this_store()->get_and_wait(&uK);
-    Set delta(users);
-    SetUpdater upd(delta);
+    IDSet delta;
+    IDSetUpdater upd(delta);
     newUsers->distributed_map(upd); // all of the new users are copied to delta.
     delete newUsers;
-    ProjectsTagger ptagger(delta, *pSet, projects);
+    IDProjectsTagger ptagger(delta, pSet);
     commits->local_map(ptagger); // marking all projects touched by delta
     merge(ptagger.newProjects, "projects-", stage);
-    pSet->union_(ptagger.newProjects); //
-    UsersTagger utagger(ptagger.newProjects, *uSet, users);
+    // pSet->union_(ptagger.newProjects);
+    combine_into_right(ptagger.newProjects, pSet);
+    IDUsersTagger utagger(ptagger.newProjects, uSet);
     commits->local_map(utagger);
     merge(utagger.newUsers, "users-", stage + 1);
-    uSet->union_(utagger.newUsers);
+    // uSet->union_(utagger.newUsers);
+    combine_into_right(utagger.newUsers, uSet);
     p("    after stage ").p(stage).pln(":");
-    p("        tagged projects: ").pln(pSet->size());
-    p("        tagged users: ").pln(uSet->size());
+    p("        tagged projects: ").pln(pSet.size());
+    p("        tagged users: ").pln(uSet.size());
   }
 
   /** Gather updates to the given set from all the nodes in the systems.
@@ -259,32 +349,32 @@ public:
    * 'users' or 'projects', stage is the degree of separation being
    * computed.
    */
-  void merge(Set &set, char const *name, int stage) {
+  void merge(IDSet &set, char const *name, int stage) {
     if (this_node() == 0) {
       for (size_t i = 1; i < arg.num_nodes; ++i) {
-        Key nK(StrBuff(name).c(stage).c("-").c(i).get());
+        Key nK(StrBuff(name).c(stage).c("-").c(i).get(), i);
         DataFrame *delta = this_store()->get_and_wait(&nK);
         p("    received delta of ")
             .p(delta->nrows())
             .p(" elements from node ")
             .pln(i);
-        SetUpdater upd(set);
+        IDSetUpdater upd(set);
         delta->distributed_map(upd);
         delete delta;
       }
       p("    storing ").p(set.size()).pln(" merged elements");
-      SetWriter writer(set);
-      Key k(StrBuff(name).c(stage).c("-0").get());
+      IDSetWriter writer(set);
+      Key k(StrBuff(name).c(stage).c("-0").get(), this_node());
       delete DataFrame::fromVisitor(&k, this_store(), "I", writer);
     } else {
       p("    sending ").p(set.size()).pln(" elements to master node");
-      SetWriter writer(set);
-      Key k(StrBuff(name).c(stage).c("-").c(this_node()).get());
+      IDSetWriter writer(set);
+      Key k(StrBuff(name).c(stage).c("-").c(this_node()).get(), this_node());
       delete DataFrame::fromVisitor(&k, this_store(), "I", writer);
       Key mK(StrBuff(name).c(stage).c("-0").get());
       DataFrame *merged = this_store()->get_and_wait(&mK);
       p("    receiving ").p(merged->nrows()).pln(" merged elements");
-      SetUpdater upd(set);
+      IDSetUpdater upd(set);
       merged->distributed_map(upd);
       delete merged;
     }

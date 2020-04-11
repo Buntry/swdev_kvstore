@@ -46,7 +46,7 @@ wc: build
 
 # Milestone 5
 linus: build
-	./a.out -pseudo -num_nodes 1 -app linus
+	./a.out -pseudo -num_nodes 8 -app linus
 
 # Milestone 3 example on a network.
 demo-net1: build

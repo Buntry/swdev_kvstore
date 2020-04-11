@@ -185,10 +185,10 @@ void KVStore::wait_to_close() {
 
 /** Stores a key and value at the desired node. **/
 void KVStore::put(Key *key, Value *value) {
-  printf("PUT K(%s) from (%d) to (%d)\n", key->key()->c_str(), (int)index(),
-         (int)key->node());
   if (key->node() == index_)
     return ConcurrentKVMap::put(key, value);
+  printf("PUT K(%s) from (%d) to (%d)\n", key->key()->c_str(), (int)index(),
+         (int)key->node());
   Message *put = new Put(key->clone(), value);
   put->init(index_, key->node(), 0);
   network_->send_msg(put);

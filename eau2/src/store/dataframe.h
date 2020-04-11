@@ -525,7 +525,7 @@ public:
 
     Serializer ser;
     distributed_schema->serialize(ser);
-    kv->put(key, new Value(*ser.data()));
+    kv->put(key, new Value(ser.steal()));
 
     // Let the df know about its true schema
     df->set_distributed_schema_(key, distributed_schema);
@@ -551,20 +551,20 @@ public:
     fc.serialize(fc_ser);
 
     Key *chunk_key = new Key(sb.get(), key->node());
-    kv->put(chunk_key, new Value(*fc_ser.data()));
+    kv->put(chunk_key, new Value(fc_ser.steal()));
     delete chunk_key;
 
     // Also put the distributed schema value.
     Serializer ser;
     distributed_schema->serialize(ser);
-    kv->put(key, new Value(*ser.data()));
+    kv->put(key, new Value(ser.steal()));
 
     return df;
   }
 
   /** Stores a 1-by-1 dataframe at the given node in the KVStore. **/
   static DataFrame *fromScalarI(Key *key, KVStore *kv, int value) {
-    Schema *distributed_schema = new Schema("F");
+    Schema *distributed_schema = new Schema("I");
 
     IntColumn ic(1, value);
     distributed_schema->add_row();
@@ -581,13 +581,13 @@ public:
     ic.serialize(ic_ser);
 
     Key *chunk_key = new Key(sb.get(), key->node());
-    kv->put(chunk_key, new Value(*ic_ser.data()));
+    kv->put(chunk_key, new Value(ic_ser.steal()));
     delete chunk_key;
 
     // Also put the distributed schema value.
     Serializer ser;
     distributed_schema->serialize(ser);
-    kv->put(key, new Value(*ser.data()));
+    kv->put(key, new Value(ser.steal()));
 
     return df;
   }
@@ -616,7 +616,7 @@ public:
         // Serialize the column into a value
         Serializer ser;
         ser.write(df->cols_.get(col));
-        kv->put(chunk_key, new Value(*ser.data()));
+        kv->put(chunk_key, new Value(ser.steal()));
 
         delete chunk_key;
       }
@@ -627,7 +627,7 @@ public:
 
     Serializer ser;
     distributed_schema->serialize(ser);
-    kv->put(k, new Value(*ser.data()));
+    kv->put(k, new Value(ser.steal()));
 
     df->set_distributed_schema_(k, distributed_schema);
     df->must_load_on_next_query_();
