@@ -203,12 +203,6 @@ public:
     readInput();
     for (size_t i = 0; i < DEGREES; i++)
       step(i);
-
-    p("Found ").p(uSet->size()).pln(" connected users.");
-    if (this_node() == last_node()) {
-      Thread::sleep(1000); // Sleep for a second.
-      stop_all();
-    }
   }
 
   /** Node 0 reads three files, cointainng projects, users and commits, and
@@ -300,6 +294,11 @@ public:
       SetUpdater upd(set);
       merged->distributed_map(upd);
       delete merged;
+    }
+
+    // If we've finished, we can quit out.
+    if (stage == (int)DEGREES) {
+      stop();
     }
   }
 };

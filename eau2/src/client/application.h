@@ -44,4 +44,5 @@ public:
     }
     store_.stop_service();
   }
+  void stop() { store_.stop_service(); }
 };
