@@ -1,8 +1,5 @@
-// Lang::CwC
+// lang: CwC
 #pragma once
-
-#include <stdio.h>
-#include <stdlib.h>
 
 #include "column.h"
 #include "rows.h"
@@ -12,15 +9,22 @@
  */
 
 /**
- * The maximum allowed length for string columns.
+ * Enum representing what mode the parser is currently using for parsing.
  */
-constexpr const size_t MAX_STRING = 255;
+enum class MyParserMode {
+  /** We're trying to find the number of columns in the schema */
+  DETECT_NUM_COLS,
+  /** We're guessing the column types */
+  DETECT_SCHEMA,
+  /** Parsing the whole file */
+  PARSE_FILE
+};
 
 /**
  * Represents a slice of a larger c-style string. Lightweight replacement for
  * allocating/copying regular c-style-strings.
  */
-class StrSlice : public Object {
+class MyStrSlice : public Object {
 public:
   size_t start_;
   size_t end_;
@@ -32,7 +36,7 @@ public:
    * @param start The starting index
    * @param end The ending index
    */
-  StrSlice(const char *str, size_t start, size_t end) : Object() {
+  MyStrSlice(const char *str, size_t start, size_t end) : Object() {
     start_ = start;
     end_ = end;
     str_ = str;
@@ -128,216 +132,20 @@ public:
   virtual String *to_str() { return new String(true, to_cstr(), size()); }
 };
 
-/**
- * This class is capable of reading a given file line-by-line in a
- * semi-efficient manner. Additionally, it can be constrained to a given start
- * and end position in the file, and will discard the first and last (possibly
- * partial) lines in this case.
- */
-class LineReader : public Object {
+/** This parser is able to parse the entirety of Schema-on-read files **/
+class MySorParser : public Object {
 public:
-  /** Temporary buffer for file contents */
-  char _buf[4096];
-  size_t _buf_length;
-  /** Current position in buffer */
-  size_t _pos;
-  /** The file we're reading from */
-  FILE *_file;
-  /** Byte indices for start, end, and total file size */
-  size_t _file_start;
-  size_t _file_end;
-  size_t _file_size;
-  /** Heap-allocated current line being built by readLine() */
-  char *_current_line;
-  size_t _current_line_size;
-  /** Total number of bytes read so far */
-  size_t _read_size;
+  Schema scm_;
+  FILE *file_ = nullptr;
+  size_t start_ = 0;
+  size_t end_ = 0;
 
-  /**
-   * Constructs a new LineReader.
-   * @param file The file to read from.
-   * @param file_start the starting index (of bytes in the file)
-   * @param file_end The ending index
-   * @param file_size The total size of the file (as obtained by e.g. ftell)
-   */
-  LineReader(FILE *file, size_t file_start, size_t file_end, size_t file_size)
-      : Object() {
-    _file = file;
-    _file_start = file_start;
-    _file_end = file_end;
-    _file_size = file_size;
-    fseek(file, file_start, SEEK_SET);
-    _current_line = nullptr;
-    _current_line_size = 0;
-    _pos = 0;
-    _buf_length = 0;
-    _read_size = 0;
-  }
+  char *line = nullptr;
+  size_t len = 0;
+  size_t bytes = 0;
+  Row *working_row_ = nullptr;
 
-  /**
-   * Destructor for LineReader
-   */
-  virtual ~LineReader() {
-    if (_current_line != nullptr) {
-      delete[] _current_line;
-    }
-  }
-
-  /**
-   * Null-terminates the current line being built and returns it, setting the
-   * _current_line member to null. Ownership of the line is transferred to the
-   * caller.
-   * @return A new null terminated string for the completed line
-   */
-  virtual char *_get_current_line() {
-    if (_current_line == nullptr) {
-      return nullptr;
-    }
-
-    char *line = _current_line;
-    line[_current_line_size] = '\0';
-    _current_line_size = 0;
-    _current_line = nullptr;
-    return line;
-  }
-
-  /**
-   * Appends a given section of the given string to the _current_line member.
-   * @param src The string to use
-   * @param start The starting index in the string to copy from
-   * @param end The ending index in the string to copy up to
-   */
-  virtual void _append_current_line(const char *src, size_t start, size_t end) {
-    char *new_line;
-    size_t copy_pos;
-    if (_current_line == nullptr) {
-      // Allocated a new heap buffer for the line
-      new_line = new char[(end - start) + 1];
-      _current_line_size = (end - start);
-      copy_pos = 0;
-    } else {
-      // Expand the existing buffer
-      new_line = new char[_current_line_size + (end - start) + 1];
-      memcpy(new_line, _current_line, _current_line_size);
-      copy_pos = _current_line_size;
-      _current_line_size += (end - start);
-      delete[] _current_line;
-    }
-
-    memcpy(&new_line[copy_pos], &src[start], end - start);
-    _current_line = new_line;
-  }
-
-  /**
-   * The main method implemented by this type. Reads the next full line out of
-   * the file. If starting from a nonzero offset or ending before the end of the
-   * file, the first and last lines respectively are skipped.
-   * @return The next line, or nullptr if we are out of lines
-   */
-  virtual char *read_line() {
-    bool skip_line = _read_size == 0 && _file_start != 0;
-
-    while (true) {
-      // If we need more data from the file, read it
-      if (_pos >= _buf_length) {
-        // If the file is over, we're done
-        if (_read_size >= _file_end - _file_start || feof(_file) ||
-            ferror(_file)) {
-          char *line = _get_current_line();
-          // If a -len was provided that is less than the file size, skip the
-          // last line
-          if (_file_end != _file_size) {
-            if (line != nullptr) {
-              delete[] line;
-            }
-            return nullptr;
-          }
-          return line;
-        }
-
-        // Read up to sizeof buf data from the file
-        size_t to_read = sizeof(_buf) / sizeof(char);
-        // If we're up to the requested end position, only read as much as
-        // necessary
-        if (_file_start + to_read > _file_end) {
-          to_read -= (_file_start + to_read) - _file_end;
-        }
-        _buf_length = fread(_buf, sizeof(char), to_read, _file);
-        _read_size += _buf_length;
-
-        // Start processing at the beginning of the buffer
-        _pos = 0;
-        if (_buf_length == 0) {
-          // If fread returned zero, go back to the start of the loop to check
-          // for feof/ferror and otherwise try reading again
-          continue;
-        }
-      }
-
-      // Search for the next newline in the current buffer, and return the
-      // completed line if we find one
-      size_t start = _pos;
-      for (size_t i = start; i < _buf_length; i++) {
-        char c = _buf[i];
-        if (c == '\n') {
-          _append_current_line(_buf, start, i);
-          _pos = i + 1;
-
-          // If we started after 0, skip the first line we read as it may be
-          // partial
-          if (skip_line) {
-            skip_line = false;
-            delete[] _get_current_line();
-            start = i + 1;
-            continue;
-          }
-
-          return _get_current_line();
-        }
-      }
-      // If no newline found, loop around and read more file data
-      _append_current_line(_buf, start, _buf_length);
-      _pos = _buf_length;
-    }
-  }
-
-  /**
-   * Resets this reader. Goes back to the start position and prepares to read
-   * lines from there again.
-   */
-  virtual void reset() {
-    if (_current_line != nullptr) {
-      delete[] _current_line;
-    }
-    _current_line = nullptr;
-    _current_line_size = 0;
-    fseek(_file, _file_start, SEEK_SET);
-    _pos = 0;
-    _buf_length = 0;
-    _read_size = 0;
-  }
-};
-
-/**
- * Enum representing what mode the parser is currently using for parsing.
- */
-enum class ParserMode {
-  /** We're trying to find the number of columns in the schema */
-  DETECT_NUM_COLUMNS,
-  /** We're guessing the column types */
-  DETECT_SCHEMA,
-  /** Parsing the whole file */
-  PARSE_FILE
-};
-
-/**
- * Parses a given file into a ColumnSet with BaseColumns representing the sor
- * data in the file.
- */
-class SorParser : public Object {
-public:
-  // Char constants for parsing
-  static const size_t GUESS_SCHEMA_LINES = 500;
+  static const size_t SCM_LINES = 500;
   static const char FIELD_BEGIN = '<';
   static const char FIELD_END = '>';
   static const char STRING_QUOTE = '"';
@@ -346,91 +154,109 @@ public:
   static const char PLUS = '+';
   static const char MINUS = '-';
 
-  /**
-   * Checks if the given char could be part of an integer or float field.
-   */
-  static bool isNumeric(char c) {
-    return c == MINUS || c == PLUS || c == DOT || (c >= '0' && c <= '9');
+  MySorParser(const char *fn) {
+    assert((file_ = fopen(fn, "r")) != nullptr);
+    fseek(file_, 0, SEEK_END);
+    end_ = ftell(file_);
+    fseek(file_, 0, SEEK_SET);
   }
 
-  /** LineReader we're using */
-  LineReader *_reader;
-  /** ColumnSet for data we will ultimately parse */
-  ColumnArray *_columns;
-  /** Array of guesses for the types of each column in the schema */
-  CharArray *_typeGuesses;
-  /** The number of columns we have detected */
-  size_t _num_columns;
-
-  /**
-   * Creates a new SorParser with the given parameters.
-   * @param file The file to read from.
-   * @param file_start the starting index (of bytes in the file)
-   * @param file_end The ending index
-   * @param file_size The total size of the file (as obtained by e.g. ftell)
-   */
-  SorParser(FILE *file, size_t file_start, size_t file_end, size_t file_size)
-      : Object() {
-    _reader = new LineReader(file, file_start, file_end, file_size);
-    _columns = nullptr;
-    _typeGuesses = nullptr;
-    _num_columns = 0;
+  ~MySorParser() {
+    delete working_row_;
+    free(line);
+    fclose(file_);
   }
 
-  /**
-   * Destructor for SorParser
-   */
-  virtual ~SorParser() {
-    delete _reader;
-    delete _columns;
-    delete _typeGuesses;
-  }
+  /** Infers the schema of the file by looking at the first 500 lines. **/
+  void infer_schema() {
+    CharArray cols;
 
-  /**
-   * Appends the next entry contained in the given StrSlice to the column at the
-   * given index, using the type of the column.
-   * @param slice The slice containing the data for this field
-   * @param field_num The column index
-   * @param columns The ColumnSet to add the data to
-   */
-  virtual void _appendField(StrSlice slice, size_t field_num,
-                            ColumnArray *columns) {
-    slice.trim(SPACE);
-
-    Column *column = columns->get(field_num);
-
-    if (slice.size() == 0) {
-      column->push_back_missing();
-      return;
+    // First get the number of columns
+    size_t max = 0;
+    for (size_t i = 0;
+         i < SCM_LINES && (bytes = getline(&line, &len, file_)) != -1UL; i++) {
+      size_t cur = scan_line_(line, bytes, cols, working_row(),
+                              MyParserMode::DETECT_NUM_COLS);
+      max = (max > cur) ? max : cur;
     }
+    rewind(file_);
 
-    switch (column->get_type()) {
-    case 'S':
-      slice.trim(STRING_QUOTE);
-      assert(slice.size() <= MAX_STRING);
-      column->as_string()->push_back_steal_(slice.to_str());
-      break;
-    case 'I':
-      column->as_int()->push_back(slice.to_int());
-      break;
-    case 'F':
-      column->as_float()->push_back(slice.to_float());
-      break;
-    case 'B':
-      column->as_bool()->push_back(slice.to_int() == 1);
-      break;
-    default:
-      assert(false);
-    }
+    // Assume all of them are booleans
+    for (size_t i = 0; i < max; i++)
+      cols.push_back('B');
+
+    // Guess the schema
+    for (size_t i = 0;
+         i < SCM_LINES && (bytes = getline(&line, &len, file_)) != -1UL; i++)
+      scan_line_(line, bytes, cols, working_row(), MyParserMode::DETECT_SCHEMA);
+
+    for (size_t i = 0; i < cols.size(); i++)
+      scm_.add_column(cols.get(i));
+
+    working_row_ = new Row(scm_);
+    rewind(file_);
   }
 
-  /**
-   * Tries to guess or update the guess for the given column index given a field
-   * contained in the given StrSlice.
-   * @param slice The slice to use
-   * @param field_num The column index
-   */
-  virtual void guess_field_type_(StrSlice slice, size_t field_num) {
+  /** Parses the next line and returns whether it set the working row. This
+   * function assumes that the schema has been inferred prior. **/
+  bool parse_line(Row *row) {
+    if ((bytes = getline(&line, &len, file_)) != -1UL) {
+      scan_line_(line, bytes, *scm_.types(), row, MyParserMode::PARSE_FILE);
+      start_ += bytes;
+      return true;
+    }
+    return false;
+  }
+  bool parse_line() { return parse_line(working_row()); }
+
+  /** Determines if whether the end of the file has been reached. **/
+  bool done() { return start_ >= end_; }
+
+  /** Returns a read-only copy of this schema **/
+  Schema *get_schema() { return &scm_; }
+
+  /** Scans one line of the file and defers to another function depending
+   * on the current mode of the parser. **/
+  size_t scan_line_(char *line, size_t len, CharArray &cols, Row *row,
+                    MyParserMode mode) {
+    size_t num_fields = 0;
+    size_t field_start = 0;
+    bool in_field = false;
+    bool in_string = false;
+
+    // Iterate over the line, create slices for each detected field, and call
+    // either _guessFieldType for ParserMode::DETECT_SCHEMA or _appendField for
+    // ParserMode::PARSE_FILE for ParserMode::DETECT_NUM_COLUMNS we simply
+    // return the number of fields we saw
+    for (size_t i = 0; i < len; i++) {
+      char c = line[i];
+      if (!in_field) {
+        if (c == FIELD_BEGIN) {
+          in_field = true;
+          field_start = i;
+        }
+      } else {
+        if (c == STRING_QUOTE) {
+          // Allow > inside quoted strings
+          in_string = !in_string;
+        } else if (c == FIELD_END && !in_string) {
+          if (mode == MyParserMode::DETECT_SCHEMA) {
+            guess_field_type_(MyStrSlice(line, field_start + 1, i), num_fields,
+                              cols);
+          } else if (mode == MyParserMode::PARSE_FILE) {
+            append_field_(MyStrSlice(line, field_start + 1, i), num_fields, row,
+                          cols);
+          }
+          in_field = false;
+          num_fields++;
+        }
+      }
+    }
+    return num_fields;
+  }
+
+  /** Guesses the type of field within the boundary of the char* **/
+  void guess_field_type_(MyStrSlice slice, size_t col, CharArray &cols) {
     slice.trim(SPACE);
     if (slice.size() == 0) {
       return;
@@ -442,7 +268,7 @@ public:
     bool has_dot = false;
     for (size_t i = 0; i < slice.size(); i++) {
       char c = slice.get_char(i);
-      if (isNumeric(c)) {
+      if (numeric(c)) {
         is_numeric = true;
         if (c == DOT) {
           has_dot = true;
@@ -450,7 +276,7 @@ public:
       }
     }
 
-    char type = _typeGuesses->get(field_num);
+    char type = cols.get(col);
     // If the guess is already string, we can't change that because that means
     // we have seen a non-numeric entry already
     if (type != 'S') {
@@ -461,174 +287,71 @@ public:
         if ((val == 0 || val == 1) && type != 'I' && type != 'F') {
           // Only keep the bool column guess if we haven't already guessed
           // integer or float (because that means we have seen non-bool values)
-          _typeGuesses->set(field_num, 'B');
+          cols.set(col, 'B');
         } else if (type != 'F') {
           // Use integer guess only if we didn't already guess float (which
           // could not be parsed as integer)
-          _typeGuesses->set(field_num, 'I');
+          cols.set(col, 'I');
         }
       } else if (is_numeric && has_dot) {
         // If there's a dot, this must be a float column
-        _typeGuesses->set(field_num, 'F');
+        cols.set(col, 'F');
       } else {
         // If there are non-numeric chars then this must be a string column
-        _typeGuesses->set(field_num, 'S');
+        cols.set(col, 'S');
       }
     }
   }
 
-  /**
-   * Finds and iterates over the deliminated fields in the given line string
-   * according to the given parsing mode.
-   * @param line The line to scan/parse
-   * @param mode The mode to use
-   * @param columns The data representation to update
-   */
-  virtual size_t scan_line_(const char *line, ParserMode mode,
-                            ColumnArray *columns) {
-    size_t num_fields = 0;
-    size_t this_field_start = 0;
-    bool in_field = false;
-    bool in_string = false;
-
-    // Iterate over the line, create slices for each detected field, and call
-    // either _guessFieldType for ParserMode::DETECT_SCHEMA or _appendField for
-    // ParserMode::PARSE_FILE for ParserMode::DETECT_NUM_COLUMNS we simply
-    // return the number of fields we saw
-    for (size_t i = 0; i < strlen(line); i++) {
-      char c = line[i];
-      if (!in_field) {
-        if (c == FIELD_BEGIN) {
-          in_field = true;
-          this_field_start = i;
-        }
-      } else {
-        if (c == STRING_QUOTE) {
-          // Allow > inside quoted strings
-          in_string = !in_string;
-        } else if (c == FIELD_END && !in_string) {
-          if (mode == ParserMode::DETECT_SCHEMA) {
-            guess_field_type_(StrSlice(line, this_field_start + 1, i),
-                              num_fields);
-          } else if (mode == ParserMode::PARSE_FILE) {
-            _appendField(StrSlice(line, this_field_start + 1, i), num_fields,
-                         columns);
-          }
-          in_field = false;
-          num_fields++;
-        }
-      }
+  /** Appends the field to the row  **/
+  void append_field_(MyStrSlice slice, size_t col, Row *row, CharArray &cols) {
+    slice.trim(SPACE);
+    if (slice.size() == 0) {
+      row->set_missing(col);
+      return;
     }
 
-    return num_fields;
-  }
-
-  /**
-   * Attempts to guess the schema based on the first 500 lines in the file.
-   * Must be called first, before parseFile or getColumnSet. Can only be called
-   * once.
-   */
-  virtual void guess_schema() {
-    assert(_columns == nullptr);
-    assert(_typeGuesses == nullptr);
-    // Detect the row with the most fields in the first 500 lines
-    size_t max_columns = 0;
-    for (size_t i = 0; i < GUESS_SCHEMA_LINES; i++) {
-      char *next_line = _reader->read_line();
-      if (next_line == nullptr) {
-        break;
-      }
-      size_t num_columns =
-          scan_line_(next_line, ParserMode::DETECT_NUM_COLUMNS, nullptr);
-      if (num_columns > max_columns) {
-        max_columns = num_columns;
-      }
-      delete[] next_line;
-    }
-    assert(max_columns != 0);
-
-    // Guess the type for each column
-    _reader->reset();
-    _columns = new ColumnArray();
-    _typeGuesses = new CharArray();
-    _num_columns = max_columns;
-    for (size_t i = 0; i < _num_columns; i++) {
-      _typeGuesses->push_back('B');
-    }
-
-    for (size_t i = 0; i < GUESS_SCHEMA_LINES; i++) {
-      char *next_line = _reader->read_line();
-      if (next_line == nullptr) {
-        break;
-      }
-      scan_line_(next_line, ParserMode::DETECT_SCHEMA, nullptr);
-      delete[] next_line;
-    }
-
-    for (size_t i = 0; i < _num_columns; i++) {
-      switch (_typeGuesses->get(i)) {
-      case 'B':
-        _columns->push_back(new BoolColumn());
-        break;
-      case 'I':
-        _columns->push_back(new IntColumn());
-        break;
-      case 'F':
-        _columns->push_back(new FloatColumn());
-        break;
-      case 'S':
-        _columns->push_back(new StringColumn());
-        break;
-      default:
-        assert(false);
-      }
+    switch (cols.get(col)) {
+    case 'S':
+      slice.trim(STRING_QUOTE);
+      row->set(col, slice.to_str());
+      break;
+    case 'I':
+      row->set(col, slice.to_int());
+      break;
+    case 'F':
+      row->set(col, slice.to_float());
+      break;
+    case 'B':
+      row->set(col, slice.to_int() == 1);
+      break;
+    default:
+      assert(false);
     }
   }
 
-  /**
-   * Parses all the data in the file (between the start index and length).
-   * guessSchema() must be called before this functions. Can only be called
-   * once.
-   */
-  virtual void parse_file() {
-    assert(_columns != nullptr);
-
-    _reader->reset();
-
-    char *line;
-    while (true) {
-      line = _reader->read_line();
-      if (line == nullptr) {
-        break;
-      }
-      size_t scanned_fields =
-          scan_line_(line, ParserMode::PARSE_FILE, _columns);
-      for (size_t i = scanned_fields; i < _num_columns; i++) {
-        _columns->get(i)->push_back_missing();
-      }
-      delete[] line;
-    }
+  /** Checks if the given char could be part of an integer or float field */
+  static bool numeric(char c) {
+    return c == MINUS || c == PLUS || c == DOT || (c >= '0' && c <= '9');
   }
 
-  /**
-   * Gets the in-memory representation for the sor data.
-   * guessSchema() and parseFile() must be called before this function.
-   */
-  virtual ColumnArray *get_column_array() { return _columns; }
+  /** Gets the working row. **/
+  Row *working_row() { return working_row_; }
 };
 
-/** I will rewrite the sor parser here as a writer **/
+/** Writes a Sor to a dataframe. **/
 class SorWriter : public Writer {
 public:
   Schema scm_;
-  SorParser *sor_;
+  MySorParser sor_;
 
-  SorWriter(const char *fn) {
-    // file length stuff
-  }
+  /** Writes the entirety of a sor file to a dataframe **/
+  SorWriter(const char *fn) : sor_(fn) { sor_.infer_schema(); }
 
-  bool accept(Row &row) { return false; }
-  bool done() { return true; }
+  /** Gets the inferred schema of the file (read-only). **/
+  Schema *get_schema() { return sor_.get_schema(); }
 
-  const char *get_schema() { return nullptr; }
+  /** Writes a row (assumes the same schema as get_schema) **/
+  bool accept(Row &row) { return sor_.parse_line(&row); }
+  bool done() { return sor_.done(); }
 };

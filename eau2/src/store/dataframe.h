@@ -180,6 +180,11 @@ public:
    *  the right schema and be filled with values, otherwise undefined.  */
   void add_row(Row &row) {
     for (size_t i = 0; i < ncols(); i++) {
+      if (row.get_missing(i)) {
+        cols_.get(i)->push_back_missing();
+        continue;
+      }
+
       switch (scm_->col_type(i)) {
       case 'B':
         cols_.get(i)->push_back(row.get_bool(i));
@@ -633,8 +638,10 @@ public:
   /** Distributes a dataframe across the network from a sorer file.  **/
   static DataFrame *fromFile(const char *filename, Key *k, KVStore *kv) {
     SorWriter sw(filename);
-    const char *schema = sw.get_schema();
-    return DataFrame::fromVisitor(k, kv, schema, sw);
+    char *schema = sw.get_schema()->c_str();
+    DataFrame *res = DataFrame::fromVisitor(k, kv, schema, sw);
+    delete[] schema;
+    return res;
   }
 };
 

@@ -100,9 +100,9 @@ public:
 
   /** Skip over false values and stop when the entire set has been seen */
   bool done() {
-    while (i_ < set_.size_ && set_.test(i_) == false)
+    while ((size_t)i_ < set_.size_ && set_.test(i_) == false)
       ++i_;
-    return i_ == set_.size_;
+    return (size_t)i_ == set_.size_;
   }
 
   void visit(Row &row) { row.set(0, i_++); }
@@ -178,8 +178,8 @@ public:
  **************************************************************************/
 class Linus : public Application {
 public:
-  int DEGREES = 4;  // How many degrees of separation form linus?
-  int LINUS = 4967; // The uid of Linus (offset in the user df)
+  size_t DEGREES = 4; // How many degrees of separation form linus?
+  int LINUS = 4967;   // The uid of Linus (offset in the user df)
   const char *PROJ = "data/projects.ltgt";
   const char *USER = "data/users.ltgt";
   const char *COMM = "data/commits.ltgt";
