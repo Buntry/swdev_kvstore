@@ -187,8 +187,8 @@ void KVStore::wait_to_close() {
 void KVStore::put(Key *key, Value *value) {
   if (key->node() == index_)
     return ConcurrentKVMap::put(key, value);
-  printf("PUT K(%s) from (%d) to (%d)\n", key->key()->c_str(), (int)index(),
-         (int)key->node());
+  // printf("PUT K(%s) from (%d) to (%d)\n", key->key()->c_str(), (int)index(),
+  //        (int)key->node());
   Message *put = new Put(key->clone(), value);
   put->init(index_, key->node(), 0);
   network_->send_msg(put);
@@ -196,9 +196,9 @@ void KVStore::put(Key *key, Value *value) {
 
 /** Reaches across the network and acquires a value from another node. **/
 Value *KVStore::get_and_wait_value(Key *key) {
-  printf("GET K(%s) from (%d) to (%d)\n", key->key()->c_str(), (int)key->node(),
-         (int)index());
-
+  // printf("GET K(%s) from (%d) to (%d)\n", key->key()->c_str(),
+  // (int)key->node(),
+  //        (int)index());
   if (key->node() == index_)
     return get_value(key);
 

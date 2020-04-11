@@ -45,8 +45,9 @@ wc: build
 	./a.out -pseudo -num_nodes 3 -app wc -file "./data/100k.txt"
 
 # Milestone 5
+# We found 7289210 users in 55 minutes on our first attempt.
 linus: build
-	./a.out -pseudo -num_nodes 8 -app linus
+	./a.out -pseudo -num_nodes 3 -app linus
 
 # Milestone 3 example on a network.
 demo-net1: build
@@ -68,4 +69,12 @@ wc-net2:
 wc-net3:
 	./a.out -num_nodes 3 -index 2 -ip 127.0.0.3 -port 8080 -server_ip 127.0.0.1 -server_port 8080 -app wc -file "./data/100k.txt"
 
+# Linus application on a network
+linus-net1: build
+	./a.out -num_nodes 3 -index 0 -ip 127.0.0.1 -port 8080 -app linus
 
+linus-net2:
+	./a.out -num_nodes 3 -index 1 -ip 127.0.0.2 -port 8080 -server_ip 127.0.0.1 -server_port 8080 -app linus
+
+linus-net3:
+	./a.out -num_nodes 3 -index 2 -ip 127.0.0.3 -port 8080 -server_ip 127.0.0.1 -server_port 8080 -app linus

@@ -20,6 +20,7 @@ public:
   /** Returns a read-only copy of this node's KV store/idx/net. **/
   KVStore *this_store() { return &store_; }
   size_t this_node() { return index_; }
+  size_t last_node() { return arg.num_nodes - 1; }
   Network *network() { return network_; }
 
   /** Runs this application, meant to be overridded. **/

@@ -24,15 +24,50 @@
  * be set to true with the set() method. The test() method returns the
  * value. Does not grow.
  ************************************************************************/
-generate_classmap(Set, IntToBool, IntArray, BoolArray, int, bool);
+// generate_classmap(Set, IntToBool, IntArray, BoolArray, int, bool);
+class Set : public Object {
+public:
+  bool *vals_ = nullptr;
+  size_t sz_ = 0;    // total capacity
+  size_t elems_ = 0; // number of elements
 
-/** Union to put all of a into b **/
-void combine_into_right(Set &a, Set &b) {
-  IntArray *a_ids = a.keys();
-  for (size_t i = 0; i < a_ids->size(); i++)
-    b.put(a_ids->get(i), true);
-  delete a_ids;
-}
+  /** Creates a set of the same size as the dataframe. **/
+  Set(DataFrame *df) : Set(df->nrows()) {}
+
+  /** Creates a set of the given size **/
+  Set(size_t sz) : vals_(new bool[sz]), sz_(sz) {
+    for (size_t i = 0; i < sz_; i++) {
+      vals_[i] = false;
+    }
+  }
+
+  ~Set() { delete[] vals_; }
+
+  /** Add idx to the set. If an idx is out of bounds, ignore it. **/
+  void set(size_t idx) {
+    if (idx >= sz_ || vals_[idx])
+      return;
+    vals_[idx] = true;
+    elems_++;
+  }
+
+  /** Is idx in the set?  See comment for set(). */
+  bool test(size_t idx) {
+    if (idx >= sz_)
+      return true; // ignoring out of bound reads
+    return vals_[idx];
+  }
+
+  size_t size() { return elems_; }
+  size_t capacity() { return sz_; }
+
+  /** Performs set union in place. */
+  void union_(Set &from) {
+    for (size_t i = 0; i < from.sz_; i++)
+      if (from.test(i))
+        set(i);
+  }
+};
 
 /*****************************************************************************
  * A SetWriter copies all the values present in the set into a one-column
@@ -41,15 +76,22 @@ void combine_into_right(Set &a, Set &b) {
  ****************************************************************************/
 class SetWriter : public Writer {
 public:
-  IntArray *ids_;
+  Set &set_;
   size_t idx_ = 0;
+  size_t num_accepted_ = 0;
 
-  SetWriter(Set &set) { ids_ = set.keys(); }
-  ~SetWriter() { delete ids_; }
+  SetWriter(Set &set) : set_(set) {}
 
-  bool done() { return idx_ >= ids_->size(); }
+  /** Skip over false values and stop when the entire set has been seen. **/
+  bool done() {
+    while (idx_ < set_.capacity() && !set_.test(idx_)) {
+      idx_++;
+    }
+    return idx_ >= set_.capacity();
+  }
+
   bool accept(Row &row) {
-    row.set(0, ids_->get(idx_++));
+    row.set(0, (int)idx_++);
     return true;
   }
 };
@@ -60,15 +102,16 @@ public:
  ******************************************************************************/
 class SetUpdater : public Rower {
 public:
-  Set &set_;
+  Set &set_; // set to update
+
   SetUpdater(Set &set) : set_(set) {}
 
   /** Assume a row with at least one column of type I. Assumes that there
    * are no missing. Reads the value and sets the corresponding position.
    * The return value is irrelevant here. */
   bool accept(Row &row) {
-    set_.put(row.get_int(0), true);
-    return true;
+    set_.set(row.get_int(0));
+    return false;
   }
 };
 
@@ -82,26 +125,27 @@ public:
  * of Linus, then the project is added to the set. If the project was
  * already tagged then it is not added to the set of newProjects.
  *************************************************************************/
-class IDProjectsTagger : public Rower {
+class ProjectsTagger : public Rower {
 public:
-  Set &uSet_;      // set of collaborator
-  Set &pSet_;      // set of projects of collaborators
+  Set &uSet;       // set of collaborator
+  Set &pSet;       // set of projects of collaborators
   Set newProjects; // newly tagged collaborator projects
 
-  IDProjectsTagger(Set &uSet, Set &pSet) : uSet_(uSet), pSet_(pSet) {}
+  ProjectsTagger(Set &uSet, Set &pSet, DataFrame *proj)
+      : uSet(uSet), pSet(pSet), newProjects(proj) {}
 
   /** The data frame must have at least two integer columns. The newProject
    * set keeps track of projects that were newly tagged (they will have to
    * be communicated to other nodes). */
-  bool accept(Row &row) {
+  bool accept(Row &row) override {
     int pid = row.get_int(0);
     int uid = row.get_int(1);
-    if (uSet_.contains_key(uid))
-      if (!pSet_.contains_key(pid)) {
-        pSet_.put(pid, true);
-        newProjects.put(pid, true);
+    if (uSet.test(uid))
+      if (!pSet.test(pid)) {
+        pSet.set(pid);
+        newProjects.set(pid);
       }
-    return true;
+    return false;
   }
 };
 
@@ -113,26 +157,24 @@ public:
  * where the pid is the idefntifier of a project and the uids are the
  * identifiers of the author and committer.
  *************************************************************************/
-class IDUsersTagger : public Rower {
+class UsersTagger : public Rower {
 public:
-  Set &pSet_;   // set of projects of collaborators
-  Set &uSet_;   // set of collaborator
-  Set newUsers; // newly tagged collaborator projects
+  Set &pSet;
+  Set &uSet;
+  Set newUsers;
 
-  IDUsersTagger(Set &pSet, Set &uSet) : pSet_(pSet), uSet_(uSet) {}
+  UsersTagger(Set &pSet, Set &uSet, DataFrame *users)
+      : pSet(pSet), uSet(uSet), newUsers(users->nrows()) {}
 
-  /** The data frame must have at least two integer columns. The newProject
-   * set keeps track of projects that were newly tagged (they will have to
-   * be communicated to other nodes). */
-  bool accept(Row &row) {
+  bool accept(Row &row) override {
     int pid = row.get_int(0);
     int uid = row.get_int(1);
-    if (pSet_.contains_key(pid))
-      if (!uSet_.contains_key(uid)) {
-        uSet_.put(uid, true);
-        newUsers.put(uid, true);
+    if (pSet.test(pid))
+      if (!uSet.test(uid)) {
+        uSet.set(uid);
+        newUsers.set(uid);
       }
-    return true;
+    return false;
   }
 };
 
@@ -145,14 +187,14 @@ class Linus : public Application {
 public:
   size_t DEGREES = 4; // How many degrees of separation form linus?
   int LINUS = 4967;   // The uid of Linus (offset in the user df)
-  const char *PROJ = "data/projects-tiny.ltgt";
-  const char *USER = "data/users-tiny.ltgt";
-  const char *COMM = "data/commits-tiny.ltgt";
+  const char *PROJ = "data/projects.ltgt";
+  const char *USER = "data/users.ltgt";
+  const char *COMM = "data/commits.ltgt";
   DataFrame *projects; //  pid x project name
   DataFrame *users;    // uid x user name
   DataFrame *commits;  // pid x uid x uid
-  Set uSet;            // Linus' collaborators
-  Set pSet;            // projects of collaborators
+  Set *uSet;           // Linus' collaborators
+  Set *pSet;           // projects of collaborators
 
   Linus(size_t idx, Network *net) : Application(idx, net) {}
 
@@ -162,7 +204,9 @@ public:
     for (size_t i = 0; i < DEGREES; i++)
       step(i);
 
-    if (this_node() == 0) {
+    p("Found ").p(uSet->size()).pln(" connected users.");
+    if (this_node() == last_node()) {
+      Thread::sleep(1000); // Sleep for a second.
       stop_all();
     }
   }
@@ -192,6 +236,8 @@ public:
       users = this_store()->get_and_wait(&uK);
       commits = this_store()->get_and_wait(&cK);
     }
+    uSet = new Set(users);
+    pSet = new Set(projects);
   }
 
   /** Performs a step of the linus calculation. It operates over the three
@@ -203,21 +249,21 @@ public:
     Key uK(StrBuff("users-").c(stage).c("-0").get());
     // A df with all the users added on the previous round
     DataFrame *newUsers = this_store()->get_and_wait(&uK);
-    Set delta;
+    Set delta(users);
     SetUpdater upd(delta);
     newUsers->distributed_map(upd); // all of the new users are copied to delta.
     delete newUsers;
-    IDProjectsTagger ptagger(delta, pSet);
+    ProjectsTagger ptagger(delta, *pSet, projects);
     commits->local_map(ptagger); // marking all projects touched by delta
     merge(ptagger.newProjects, "projects-", stage);
-    combine_into_right(ptagger.newProjects, pSet);
-    IDUsersTagger utagger(ptagger.newProjects, uSet);
+    pSet->union_(ptagger.newProjects);
+    UsersTagger utagger(ptagger.newProjects, *uSet, users);
     commits->local_map(utagger);
     merge(utagger.newUsers, "users-", stage + 1);
-    combine_into_right(utagger.newUsers, uSet);
+    uSet->union_(utagger.newUsers);
     p("    after stage ").p(stage).pln(":");
-    p("        tagged projects: ").pln(pSet.size());
-    p("        tagged users: ").pln(uSet.size());
+    p("        tagged projects: ").pln(pSet->size());
+    p("        tagged users: ").pln(uSet->size());
   }
 
   /** Gather updates to the given set from all the nodes in the systems.
@@ -228,7 +274,7 @@ public:
    */
   void merge(Set &set, char const *name, int stage) {
     if (this_node() == 0) {
-      for (size_t i = 1; i < arg.num_nodes; ++i) {
+      for (size_t i = 1; i < arg.num_nodes; i++) {
         Key nK(StrBuff(name).c(stage).c("-").c(i).get(), i);
         DataFrame *delta = this_store()->get_and_wait(&nK);
         p("    received delta of ")
