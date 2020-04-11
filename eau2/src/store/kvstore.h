@@ -32,7 +32,7 @@ DataFrame *KVStore::get_and_wait(Key *key) {
 
   // Load data from off this node
   Value *from = get_and_wait_value(key);
-  Deserializer dser(*from->blob());
+  Deserializer dser(from->steal());
   delete from;
 
   Schema *schema = Schema::deserialize(dser);
@@ -185,6 +185,8 @@ void KVStore::wait_to_close() {
 
 /** Stores a key and value at the desired node. **/
 void KVStore::put(Key *key, Value *value) {
+  printf("PUT K(%s) from (%d) to (%d)\n", key->key()->c_str(), (int)index(),
+         (int)key->node());
   if (key->node() == index_)
     return ConcurrentKVMap::put(key, value);
   Message *put = new Put(key->clone(), value);
@@ -194,6 +196,9 @@ void KVStore::put(Key *key, Value *value) {
 
 /** Reaches across the network and acquires a value from another node. **/
 Value *KVStore::get_and_wait_value(Key *key) {
+  printf("GET K(%s) from (%d) to (%d)\n", key->key()->c_str(), (int)key->node(),
+         (int)index());
+
   if (key->node() == index_)
     return get_value(key);
 

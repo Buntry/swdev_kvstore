@@ -56,10 +56,16 @@ public:
   Value(Deserializer &dser) : blob_(dser.data()->clone()) {}
   ~Value() { delete blob_; }
 
-  /** Returns the blob of data. **/
   CharArray *blob() { return blob_; }
   size_t size() { return blob_->size(); }
-  Value *clone() { return new Value(*blob()); }
+  Value *clone() { return new Value(*blob_); }
+
+  /** Steals a character array from this value. Must be deleted after **/
+  CharArray *steal() {
+    CharArray *give = blob_;
+    blob_ = nullptr;
+    return give;
+  }
 
   /** Serializes a value into a serializer. **/
   void serialize(Serializer &ser) {

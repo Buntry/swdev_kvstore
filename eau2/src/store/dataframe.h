@@ -365,7 +365,7 @@ public:
     Value *val = (target == store_->index())
                      ? store_->get_value(chunk_key)->clone()
                      : store_->get_and_wait_value(chunk_key);
-    Deserializer dser(*val->blob());
+    Deserializer dser(val->steal());
     delete chunk_key;
     delete val;
     delete cols_.set(col, Column::deserialize(dser));
@@ -396,8 +396,8 @@ public:
       sb.c(*key_->key()).c("-column").c(col).c("-chunk").c(chunk);
       Key *chunk_key = new Key(sb.get(), store_->index());
 
-      Value *v = store_->get_value(chunk_key);
-      Deserializer dser(*v->blob());
+      Value *val = store_->get_value(chunk_key);
+      Deserializer dser(*val->blob());
       delete cols_.set(col, Column::deserialize(dser));
 
       delete chunk_key;
@@ -416,7 +416,7 @@ public:
       Key *chunk_key = new Key(sb.get(), target);
 
       Value *val = store_->get_and_wait_value(chunk_key);
-      Deserializer dser(*val->blob());
+      Deserializer dser(val->steal());
       delete cols_.set(col, Column::deserialize(dser));
       delete val;
       delete chunk_key;
