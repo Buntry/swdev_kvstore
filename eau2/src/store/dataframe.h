@@ -651,15 +651,8 @@ public:
     DataFrame *df = new DataFrame(scm, kv);
     df->set_distributed_schema_(k, distributed_schema);
     df->must_load_on_next_query_();
+    fclose(f);
     return df;
-
-    // OLD PARSER CODE
-    // return nullptr;
-    // SorWriter sw(filename);
-    // char *schema = sw.get_schema()->c_str();
-    // DataFrame *res = DataFrame::fromVisitor(k, kv, schema, sw);
-    // delete[] schema;
-    // return res;
   }
 
   /** Distributes an array of columns at the specified chunk **/

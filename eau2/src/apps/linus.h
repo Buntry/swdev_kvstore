@@ -187,9 +187,9 @@ class Linus : public Application {
 public:
   size_t DEGREES = 4; // How many degrees of separation form linus?
   int LINUS = 4967;   // The uid of Linus (offset in the user df)
-  const char *PROJ = "data/projects.ltgt";
-  const char *USER = "data/users.ltgt";
-  const char *COMM = "data/commits.ltgt";
+  const char *PROJ = "data/projects-tiny.ltgt";
+  const char *USER = "data/users-tiny.ltgt";
+  const char *COMM = "data/commits-tiny.ltgt";
   DataFrame *projects; //  pid x project name
   DataFrame *users;    // uid x user name
   DataFrame *commits;  // pid x uid x uid
@@ -197,6 +197,13 @@ public:
   Set *pSet;           // projects of collaborators
 
   Linus(size_t idx, Network *net) : Application(idx, net) {}
+  ~Linus() {
+    delete projects;
+    delete users;
+    delete commits;
+    delete uSet;
+    delete pSet;
+  }
 
   /** Compute DEGREES of Linus. */
   void run_() override {
@@ -224,7 +231,8 @@ public:
       commits = DataFrame::fromFile(COMM, &cK, this_store());
       p("    ").p(commits->nrows()).pln(" commits");
       // This dataframe contains the id of Linus.
-      delete DataFrame::fromScalarI(new Key("users-0-0"), this_store(), LINUS);
+      Key linus("users-0-0");
+      delete DataFrame::fromScalarI(&linus, this_store(), LINUS);
     } else {
       projects = this_store()->get_and_wait(&pK);
       users = this_store()->get_and_wait(&uK);

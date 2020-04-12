@@ -20,7 +20,7 @@ run: build
 
 # Valgrind the mainfile
 valgr: build
-	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes -v ./a.out -pseudo -num_nodes 3 -app wc -file "./data/100k.txt"
+	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes -v ./a.out -pseudo -num_nodes 3 -app linus
 
 # Cleans only the compiled binaries and datafiles
 clean:
@@ -45,7 +45,7 @@ wc: build
 	./a.out -pseudo -num_nodes 3 -app wc -file "./data/100k.txt"
 
 # Milestone 5
-# We found 7289210 users in 55 minutes on our first attempt.
+# We found 7289210 users in 30 minutes on our second attempt.
 linus: build
 	./a.out -pseudo -num_nodes 3 -app linus
 

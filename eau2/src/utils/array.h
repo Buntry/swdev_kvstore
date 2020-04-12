@@ -6,8 +6,8 @@
 #include "string.h"
 #include "util.h"
 
-// static const size_t CHUNK_SIZE = 20971520;
-static const size_t CHUNK_SIZE = 1024; // debug chunk size must use for M4.
+static const size_t CHUNK_SIZE = 20971520;
+// static const size_t CHUNK_SIZE = 1024; // debug chunk size must use for M4.
 
 #define generate_classarray(KlassArray, Stores)                                \
   class KlassArray : public Object {                                           \
