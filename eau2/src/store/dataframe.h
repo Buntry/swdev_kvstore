@@ -196,7 +196,7 @@ public:
         cols_.get(i)->push_back(row.get_float(i));
         break;
       case 'S':
-        cols_.get(i)->push_back(row.get_string(i));
+        cols_.get(i)->as_string()->push_back(row.get_string(i));
         break;
       default:
         assert(false);
@@ -606,23 +606,7 @@ public:
         distributed_schema->add_row();
       }
 
-      for (size_t col = 0; col < df->ncols(); col++) {
-        // Build the key for the current column chunk
-        size_t target = ((k->node() + cur_chunk) % arg.num_nodes);
-        StrBuff sb;
-        sb.c(*k->key()).c("-column").c(col).c("-chunk").c(cur_chunk);
-        Key *chunk_key = new Key(sb.get(), target);
-
-        // Serialize the column into a value
-        Serializer ser;
-        ser.write(df->cols_.get(col));
-        kv->put(chunk_key, new Value(ser.steal()));
-
-        delete chunk_key;
-      }
-
-      delete df;
-      df = new DataFrame(scm, kv);
+      DataFrame::distribute_columns(&df->cols_, cur_chunk, k, kv);
     }
 
     Serializer ser;
@@ -637,11 +621,60 @@ public:
 
   /** Distributes a dataframe across the network from a sorer file.  **/
   static DataFrame *fromFile(const char *filename, Key *k, KVStore *kv) {
-    SorWriter sw(filename);
-    char *schema = sw.get_schema()->c_str();
-    DataFrame *res = DataFrame::fromVisitor(k, kv, schema, sw);
-    delete[] schema;
-    return res;
+    FILE *f = fopen(filename, "r");
+    assert(f != nullptr);
+
+    fseek(f, 0, SEEK_END);
+    size_t file_length = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    size_t chunk = 0;
+
+    SorParser sor(f, 0, file_length, file_length);
+    Schema *distributed_schema = sor.guess_schema();
+    Schema scm(*distributed_schema);
+
+    for (; sor.parseFile(); chunk++) {
+      DataFrame::distribute_columns(sor.get_columns(), chunk, k, kv);
+      for (size_t i = 0; i < CHUNK_SIZE; i++)
+        distributed_schema->add_row();
+    }
+    ColumnArray *cols = sor.get_columns();
+    if (cols->size() > 0)
+      for (size_t i = 0; i < cols->get(0)->size(); i++)
+        distributed_schema->add_row();
+    DataFrame::distribute_columns(cols, chunk, k, kv);
+
+    Serializer ser;
+    distributed_schema->serialize(ser);
+    kv->put(k, new Value(ser.steal()));
+
+    DataFrame *df = new DataFrame(scm, kv);
+    df->set_distributed_schema_(k, distributed_schema);
+    df->must_load_on_next_query_();
+    fclose(f);
+    return df;
+  }
+
+  /** Distributes an array of columns at the specified chunk **/
+  static void distribute_columns(ColumnArray *ca, size_t chunk, Key *k,
+                                 KVStore *kv) {
+    for (size_t col = 0; col < ca->size(); col++) {
+      // Build the key for the current column chunk
+      size_t target = ((k->node() + chunk) % arg.num_nodes);
+      StrBuff sb;
+      sb.c(*k->key()).c("-column").c(col).c("-chunk").c(chunk);
+      Key *chunk_key = new Key(sb.get(), target);
+
+      // Serialize the column into a value
+      Serializer ser;
+      ser.write(ca->get(col));
+      kv->put(chunk_key, new Value(ser.steal()));
+      delete chunk_key;
+
+      // Reinitialize the column
+      char type = ca->get(col)->get_type();
+      delete ca->set(col, Column::init(type));
+    }
   }
 };
 

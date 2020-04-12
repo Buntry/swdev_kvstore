@@ -63,6 +63,9 @@ public:
 
   /** Deserializes a column of the correct type. **/
   static Column *deserialize(Deserializer &dser);
+
+  /** Initializes a column from a type **/
+  static Column *init(char type);
 };
 
 /*************************************************************************
@@ -395,9 +398,8 @@ public:
     }
   };
 
-  /** Steals this string on push back, only used for deserialization. **/
+  /** Steals this string on push back, used to avoid cloning. **/
   void push_back_steal_(String *s) {
-    assert(s != nullptr);
     missing_.push_back(false);
     vals_.push_back(s);
   }
@@ -468,6 +470,22 @@ Column *Column::deserialize(Deserializer &dser) {
     assert(false);
     return nullptr;
   }
+}
+
+Column *Column::init(char type) {
+  switch (type) {
+  case 'B':
+    return new BoolColumn();
+  case 'I':
+    return new IntColumn();
+  case 'F':
+    return new FloatColumn();
+  case 'S':
+    return new StringColumn();
+  default:
+    assert(false);
+  }
+  return nullptr;
 }
 
 /** Generate column array class **/

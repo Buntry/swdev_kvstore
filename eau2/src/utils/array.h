@@ -6,7 +6,8 @@
 #include "string.h"
 #include "util.h"
 
-static const size_t CHUNK_SIZE = 20971520;
+// static const size_t CHUNK_SIZE = 20971520; // 20 MB
+static const size_t CHUNK_SIZE = 16384; // 2^14 B
 // static const size_t CHUNK_SIZE = 1024; // debug chunk size must use for M4.
 
 #define generate_classarray(KlassArray, Stores)                                \

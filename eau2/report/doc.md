@@ -42,8 +42,8 @@ In order to write an application, a user must subclass Application and override 
 To access which node the Application is running on, useful for switching context and assigning different
 jobs for different nodes, there is another method called `size_t this_node()`
 
-Applications should start and wait until they receive a message to stop. I think we are having issues with
-applications stopping prematurely when we are using an IP-based network.
+Applications should start and wait until they receive a message to stop. Applications provide several methods
+for invoking an application to stop running gracefully.
 
 ###### KVStore (Key-Value Store)
 
@@ -153,5 +153,6 @@ refactor our KV implementation.
 
 #### Status
 
-We spent this week finishing up milestone 4. Our networkIP implementation is fixed and our valgrind results show
-no leaks, even for M4!
+We spent this week finishing up milestone 5. Our networkIP implementation is fixed and our valgrind results show
+no leaks, even for M5! Albeit running was about twice as slow as the recommended time, we are proud of what we
+submitted and that we got it fully working.
