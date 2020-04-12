@@ -54,7 +54,7 @@ public:
   /** Is idx in the set?  See comment for set(). */
   bool test(size_t idx) {
     if (idx >= sz_)
-      return true; // ignoring out of bound reads
+      return false; // ignoring out of bound reads
     return vals_[idx];
   }
 
@@ -169,6 +169,7 @@ public:
   bool accept(Row &row) override {
     int pid = row.get_int(0);
     int uid = row.get_int(1);
+
     if (pSet.test(pid))
       if (!uSet.test(uid)) {
         uSet.set(uid);
@@ -210,6 +211,11 @@ public:
     readInput();
     for (size_t i = 0; i < DEGREES; i++)
       step(i);
+
+    if (this_node() == last_node()) {
+      sleep(100);
+      stop_all();
+    }
   }
 
   /** Node 0 reads three files, cointainng projects, users and commits, and
@@ -255,6 +261,7 @@ public:
     SetUpdater upd(delta);
     newUsers->distributed_map(upd); // all of the new users are copied to delta.
     delete newUsers;
+
     ProjectsTagger ptagger(delta, *pSet, projects);
     commits->local_map(ptagger); // marking all projects touched by delta
     merge(ptagger.newProjects, "projects-", stage);
@@ -302,11 +309,6 @@ public:
       SetUpdater upd(set);
       merged->distributed_map(upd);
       delete merged;
-    }
-
-    // If we've finished, we can quit out.
-    if (stage == (int)DEGREES) {
-      stop();
     }
   }
 };

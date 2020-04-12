@@ -44,5 +44,7 @@ public:
     }
     store_.stop_service();
   }
-  void stop() { store_.stop_service(); }
+
+  /** Sleeps for an amount of milliseconds **/
+  void sleep(size_t ms) { Thread::sleep(ms); }
 };

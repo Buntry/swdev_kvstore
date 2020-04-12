@@ -14,6 +14,9 @@ gclean:
 build: ./src/main.cpp
 	g++ -std=c++11 ./src/main.cpp -Wall -ggdb3 --pedantic -pthread
 
+fastbuild: ./src/main.cpp
+	g++ -std=c++11 ./src/main.cpp -O3 -pthread
+
 # Run the mainfile
 run: build
 	./a.out -pseudo -num_nodes 3 -app test
@@ -45,7 +48,7 @@ wc: build
 	./a.out -pseudo -num_nodes 3 -app wc -file "./data/100k.txt"
 
 # Milestone 5
-# We found 7289210 users in 30 minutes on our second attempt.
+# We found 7289210 users in 20 minutes on our third attempt.
 linus: build
 	./a.out -pseudo -num_nodes 3 -app linus
 
@@ -70,7 +73,7 @@ wc-net3:
 	./a.out -num_nodes 3 -index 2 -ip 127.0.0.3 -port 8080 -server_ip 127.0.0.1 -server_port 8080 -app wc -file "./data/100k.txt"
 
 # Linus application on a network
-linus-net1: build
+linus-net1: fastbuild
 	./a.out -num_nodes 3 -index 0 -ip 127.0.0.1 -port 8080 -app linus
 
 linus-net2:
