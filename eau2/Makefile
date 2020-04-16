@@ -19,7 +19,7 @@ fastbuild: ./src/main.cpp
 
 # Run the mainfile
 run: build
-	./a.out -pseudo -num_nodes 3 -app test
+	./a.out -pseudo -num_nodes 3 -app demo
 
 # Valgrind the mainfile
 valgr: build
@@ -31,7 +31,7 @@ clean:
 
 # Examples of running our application
 pseudo: build
-	./a.out -pseudo -num_nodes 3 -app test
+	./a.out -pseudo -num_nodes 3 -app demo
 	
 triv: build
 	./a.out -pseudo -num_nodes 1 -app trivial
